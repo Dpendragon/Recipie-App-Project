@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+// Nguồn của công thức.
+enum RecipeSource {
+  LOCAL
+  SPOONACULAR
+}
+
+// Các buổi ăn trong kế hoạch.
+enum MealSlot {
+  BREAKFAST @map("breakfast")
+  LUNCH     @map("lunch")
+  DINNER    @map("dinner")
+}
+
+// Mức độ đầy đủ của thông tin dinh dưỡng.
+enum NutritionCoverage {
+  FULL
+  PARTIAL
+  NONE
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(255)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  name         String?   @db.VarChar(100)
+  avatarUrl    String?   @map("avatar_url") @db.VarChar(500)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+
+  recipes         Recipe[]
+  favorites       Favorite[]
+  shoppingItems   ShoppingItem[]
+  recipeReviews   RecipeReview[]
+  mealPlanEntries MealPlanEntry[]
+
+  @@map("users")
+}
+
+model Recipe {
+  id                 Int                @id @default(autoincrement())
+  authorId           Int                @map("author_id")
+  title              String             @db.VarChar(255)
+  servings           Int
+  readyInMinutes     Int?               @map("ready_in_minutes")
+  diets              Json?
+  dishTypes          Json?              @map("dish_types")
+  steps              String             @db.Text
+  imageUrl           String?            @map("image_url") @db.VarChar(500)
+  videoUrl           String?            @map("video_url") @db.VarChar(500)
+  nutrition          Json?
+  nutritionCoverage  NutritionCoverage? @map("nutrition_coverage")
+  nutritionUpdatedAt DateTime?          @map("nutrition_updated_at")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  author      User               @relation(fields: [authorId], references: [id])
+  ingredients RecipeIngredient[]
+
+  @@map("recipes")
+}
+
+model RecipeIngredient {
+  id           Int      @id @default(autoincrement())
+  recipeId     Int      @map("recipe_id")
+  ingredientId Int?     @map("ingredient_id")
+  nameVi       String   @map("name_vi") @db.VarChar(255)
+  nameEn       String?  @map("name_en") @db.VarChar(255)
+  quantity     Decimal? @db.Decimal(10, 2)
+  unit         String?  @db.VarChar(50)
+  sortOrder    Int      @map("sort_order")
+
+  recipe     Recipe      @relation(fields: [recipeId], references: [id], onDelete: Cascade)
+  ingredient Ingredient? @relation(fields: [ingredientId], references: [id], onDelete: SetNull)
+
+  @@map("recipe_ingredients")
+}
+
+model Ingredient {
+  id                 Int      @id @default(autoincrement())
+  nameVi             String   @map("name_vi") @db.VarChar(255)
+  nameEn             String   @unique @map("name_en") @db.VarChar(255)
+  commonUnit         String?  @map("common_unit") @db.VarChar(20)
+  gramsPerCommonUnit Decimal? @map("grams_per_common_unit") @db.Decimal(10, 2)
+  mlPerCommonUnit    Decimal? @map("ml_per_common_unit") @db.Decimal(10, 2)
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  recipeIngredients RecipeIngredient[]
+  nutrition         IngredientNutrition?
+
+  @@map("ingredients")
+}
+
+model IngredientNutrition {
+  id            Int     @id @default(autoincrement())
+  ingredientId  Int     @unique @map("ingredient_id")
+  basisQuantity Decimal @default(100) @map("basis_quantity") @db.Decimal(10, 2)
+  basisUnit     String  @map("basis_unit") @db.VarChar(10)
+
+  calories      Decimal  @db.Decimal(10, 2)
+  protein       Decimal  @db.Decimal(10, 2)
+  fat           Decimal  @db.Decimal(10, 2)
+  carbohydrates Decimal  @db.Decimal(10, 2)
+  fiber         Decimal? @db.Decimal(10, 2)
+  sugar         Decimal? @db.Decimal(10, 2)
+  sodium        Decimal? @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  ingredient Ingredient @relation(fields: [ingredientId], references: [id], onDelete: Cascade)
+
+  @@map("ingredient_nutrition")
+}
+
+model Favorite {
+  id            Int          @id @default(autoincrement())
+  userId        Int          @map("user_id")
+  recipeId      String       @map("recipe_id") @db.VarChar(50)
+  source        RecipeSource
+  titleSnapshot String       @map("title_snapshot") @db.VarChar(255)
+  imageSnapshot String?      @map("image_snapshot") @db.VarChar(500)
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, recipeId, source])
+  @@index([userId, createdAt])
+  @@map("favorites")
+}
+
+model ShoppingItem {
+  id       Int     @id @default(autoincrement())
+  userId   Int     @map("user_id")
+  name     String  @db.VarChar(255)
+  quantity String? @db.VarChar(100)
+  note     String? @db.Text
+  checked  Boolean @default(false)
+
+  sourceRecipeId      String?       @map("source_recipe_id") @db.VarChar(50)
+  source              RecipeSource?
+  recipeTitleSnapshot String?       @map("recipe_title_snapshot") @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, checked])
+  @@index([userId, sourceRecipeId, source])
+  @@map("shopping_items")
+}
+
+model RecipeReview {
+  id            Int          @id @default(autoincrement())
+  userId        Int          @map("user_id")
+  recipeId      String       @map("recipe_id") @db.VarChar(50)
+  source        RecipeSource
+  titleSnapshot String       @map("title_snapshot") @db.VarChar(255)
+  imageSnapshot String?      @map("image_snapshot") @db.VarChar(500)
+  rating        Int          @db.TinyInt
+  comment       String?      @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, recipeId, source])
+  @@index([recipeId, source])
+  @@map("recipe_reviews")
+}
+
+model MealPlanEntry {
+  id            Int          @id @default(autoincrement())
+  userId        Int          @map("user_id")
+  date          DateTime     @db.Date
+  mealSlot      MealSlot     @map("meal_slot")
+  recipeId      String       @map("recipe_id") @db.VarChar(50)
+  source        RecipeSource
+  titleSnapshot String?      @map("title_snapshot") @db.VarChar(255)
+  imageSnapshot String?      @map("image_snapshot") @db.VarChar(500)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId, date, mealSlot])
+  @@map("meal_plan_entries")
+}
