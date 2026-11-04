@@ -1,0 +1,24 @@
+{
+  // Prettier chỉ format nơi có file cấu hình (backend/.prettierrc),
+  // nên lưu file trong mobile/ sẽ không bị đổi định dạng hàng loạt.
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "prettier.requireConfig": true,
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+
+  // Repo dùng xuống dòng kiểu LF.
+  "files.eol": "\n",
+
+  // Ẩn thư mục sinh tự động khỏi tìm kiếm (vẫn thấy trong cây thư mục).
+  "search.exclude": {
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/.expo": true,
+    "backend/src/generated": true
+  },
+
+  // Tự gợi ý import đúng đường dẫn alias @/ của mobile.
+  "typescript.preferences.importModuleSpecifier": "non-relative"
+}

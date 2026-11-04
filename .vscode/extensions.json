@@ -1,0 +1,12 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "expo.vscode-expo-tools",
+    "Prisma.prisma",
+    "oxc.oxc-vscode",
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "cweijan.vscode-mysql-client2",
+    "mikestead.dotenv"
+  ]
+}
