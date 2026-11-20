@@ -15,6 +15,13 @@ export function getApiErrorMessage(error: unknown): string {
   return 'Đã có lỗi xảy ra. Vui lòng thử lại.';
 }
 
+export function getApiErrorCode(error: unknown): string | undefined {
+  if (isAxiosError(error)) {
+    return (error.response?.data as { code?: string } | undefined)?.code;
+  }
+  return undefined;
+}
+
 export function showComingSoon(featureName: string): void {
   Alert.alert('Sắp ra mắt', `${featureName} sẽ được bổ sung ở các giai đoạn sau.`);
 }

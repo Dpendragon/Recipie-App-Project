@@ -1,15 +1,13 @@
 import { SplashScreen } from 'expo-router';
-import { useAuth } from '@/hooks/useAuth';
+import { useEffect } from 'react';
 
 SplashScreen.preventAutoHideAsync();
 
 // Giữ splash screen cho tới khi biết chắc trạng thái đăng nhập
 export function SplashScreenController() {
-  const { status } = useAuth();
-
-  if (status !== 'loading') {
+  useEffect(() => {
     SplashScreen.hide();
-  }
+  }, []);
 
   return null;
 }

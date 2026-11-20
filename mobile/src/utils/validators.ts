@@ -19,6 +19,12 @@ export function validatePassword(password: string): string | null {
   return null;
 }
 
+export function validateConfirmPassword(password: string, confirm: string): string | null {
+  if (!confirm) return 'Vui lòng nhập lại mật khẩu';
+  if (password !== confirm) return 'Mật khẩu nhập lại không khớp';
+  return null;
+}
+
 export function validateName(name: string): string | null {
   if (name.trim().length > 100) return 'Họ tên tối đa 100 ký tự';
   return null;
