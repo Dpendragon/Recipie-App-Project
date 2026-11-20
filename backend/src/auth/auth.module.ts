@@ -7,11 +7,13 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { MailerModule } from '../mailer/mailer.module';
 
 @Module({
   imports: [
     // PassportModule: nền tảng "xác thực" mà JwtStrategy dựa vào.
     PassportModule,
+    MailerModule,
 
     // JwtModule: cung cấp JwtService để KÝ (tạo) và KIỂM TRA token.
     JwtModule.registerAsync({
