@@ -12,6 +12,7 @@ type AuthStatus = 'loading' | 'signedIn' | 'signedOut' | 'offline';
 
 export type AuthContextValue = {
   status: AuthStatus;
+  sessionExpired: boolean;
   signIn: (token: string, remember?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   retry: () => void;
@@ -21,6 +22,7 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
+  const [sessionExpired, setSessionExpired] = useState(false);
 
   // Kiểm tra phiên đăng nhập
   const verify = useCallback(async () => {
@@ -37,8 +39,8 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setStatus('signedIn');
     } catch (error: any) {
       if (error?.response?.status === 401) {
-        // 401 = backend từ chối token
         await deleteToken();
+        setSessionExpired(true);
         setStatus('signedOut');
       } else {
         setStatus('offline');
@@ -52,16 +54,18 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signIn = useCallback(async (token: string, remember = true) => {
     await setToken(token, remember);
+    setSessionExpired(false);
     setStatus('signedIn');
   }, []);
 
   const signOut = useCallback(async () => {
     await deleteToken();
+    setSessionExpired(false);
     setStatus('signedOut');
   }, []);
 
   return (
-    <AuthContext.Provider value={{ status, signIn, signOut, retry: verify }}>
+    <AuthContext.Provider value={{ status, sessionExpired, signIn, signOut, retry: verify }}>
       {children}
     </AuthContext.Provider>
   );

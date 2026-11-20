@@ -1,13 +1,8 @@
 import { Stack } from 'expo-router';
 import { useFonts } from 'expo-font';
-import { Quicksand_700Bold } from '@expo-google-fonts/quicksand';
-import {
-  BeVietnamPro_400Regular,
-  BeVietnamPro_500Medium,
-  BeVietnamPro_600SemiBold,
-  BeVietnamPro_700Bold,
-} from '@expo-google-fonts/be-vietnam-pro';
+import { Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google-fonts/inter';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SessionCheckScreen } from '@/components/auth/SessionCheckScreen';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { SplashScreenController } from '@/splash';
@@ -15,11 +10,9 @@ import { colors, fonts, radius } from '@/constants/theme';
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({
-    Quicksand_700Bold,
-    BeVietnamPro_400Regular,
-    BeVietnamPro_500Medium,
-    BeVietnamPro_600SemiBold,
-    BeVietnamPro_700Bold,
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
   });
 
   if (!fontsLoaded && !fontError) {
@@ -36,6 +29,10 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { status, retry } = useAuth();
+
+  if (status === 'loading') {
+    return <SessionCheckScreen />;
+  }
 
   if (status === 'offline') {
     return <OfflineNotice onRetry={retry} />;
@@ -54,7 +51,6 @@ function RootNavigator() {
   );
 }
 
-// Màn hình "Mất kết nối" khi không xác minh được phiên đăng nhập.
 function OfflineNotice({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.container}>
@@ -78,7 +74,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.background,
   },
-  title: { fontFamily: fonts.heading, fontSize: 22, color: colors.textDark },
+  title: { fontFamily: fonts.bold, fontSize: 22, color: colors.textDark },
   message: {
     fontFamily: fonts.regular,
     fontSize: 14,
