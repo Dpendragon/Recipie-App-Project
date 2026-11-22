@@ -44,6 +44,10 @@ const PUBLIC_USER_SELECT = {
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
+  private readonly otpRequestLimits = new Map<
+    string,
+    { count: number; windowStartedAt: number }
+  >();
 
   constructor(
     private readonly prisma: PrismaService,
@@ -124,6 +128,8 @@ export class AuthService {
       message: 'Nếu email tồn tại, mã xác nhận đã được gửi',
     };
 
+    this.enforcePublicOtpRequestLimit(dto.email);
+
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
@@ -142,21 +148,8 @@ export class AuthService {
     });
 
     if (recentRequests.length >= OTP_MAX_REQUESTS) {
-      const unlockAt =
-        recentRequests[0].createdAt.getTime() +
-        OTP_REQUEST_WINDOW_MINUTES * 60 * 1000;
-      const waitMinutes = Math.max(
-        1,
-        Math.ceil((unlockAt - Date.now()) / 60000),
-      );
       this.logger.warn(`Email ${user.email} xin OTP quá ${OTP_MAX_REQUESTS} lần`);
-      throw new HttpException(
-        {
-          message: `Bạn đã yêu cầu mã quá nhiều lần. Vui lòng thử lại sau ${waitMinutes} phút`,
-          code: 'OTP_TOO_MANY_REQUESTS',
-        },
-        HttpStatus.TOO_MANY_REQUESTS,
-      );
+      return neutralResponse;
     }
 
     const otp = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -176,6 +169,35 @@ export class AuthService {
     }
 
     return neutralResponse;
+  }
+
+  private enforcePublicOtpRequestLimit(email: string) {
+    const now = Date.now();
+    const windowMs = OTP_REQUEST_WINDOW_MINUTES * 60 * 1000;
+
+    for (const [key, limit] of this.otpRequestLimits) {
+      if (now - limit.windowStartedAt >= windowMs) {
+        this.otpRequestLimits.delete(key);
+      }
+    }
+
+    const limit = this.otpRequestLimits.get(email);
+    if (!limit || now - limit.windowStartedAt >= windowMs) {
+      this.otpRequestLimits.set(email, { count: 1, windowStartedAt: now });
+      return;
+    }
+
+    if (limit.count >= OTP_MAX_REQUESTS) {
+      throw new HttpException(
+        {
+          message: 'Bạn đã yêu cầu mã quá nhiều lần. Vui lòng thử lại sau',
+          code: 'OTP_TOO_MANY_REQUESTS',
+        },
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    limit.count += 1;
   }
 
   // Kiểm tra OTP. Đúng thì trả về resetToken (JWT sống ngắn).
@@ -201,19 +223,43 @@ export class AuthService {
       throw expiredError;
     }
 
-    if (record.attempts >= OTP_MAX_ATTEMPTS) {
-      throw new BadRequestException({
-        message: 'Bạn đã nhập sai quá nhiều lần. Vui lòng gửi lại mã mới',
-        code: 'OTP_LOCKED',
+    const lockedError = new BadRequestException({
+      message: 'Bạn đã nhập sai quá nhiều lần. Vui lòng gửi lại mã mới',
+      code: 'OTP_LOCKED',
+    });
+
+    const reservation = await this.prisma.passwordResetOtp.updateMany({
+      where: {
+        id: record.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+        attempts: { lt: OTP_MAX_ATTEMPTS },
+      },
+      data: { attempts: { increment: 1 } },
+    });
+    if (reservation.count === 0) {
+      const currentRecord = await this.prisma.passwordResetOtp.findUnique({
+        where: { id: record.id },
+        select: { consumedAt: true, attempts: true, expiresAt: true },
       });
+
+      if (
+        !currentRecord ||
+        currentRecord.consumedAt !== null ||
+        currentRecord.expiresAt <= new Date()
+      ) {
+        throw expiredError;
+      }
+
+      if (currentRecord.attempts >= OTP_MAX_ATTEMPTS) {
+        throw lockedError;
+      }
+
+      throw expiredError;
     }
 
     const otpMatches = await compare(dto.otp, record.otpHash);
     if (!otpMatches) {
-      await this.prisma.passwordResetOtp.update({
-        where: { id: record.id },
-        data: { attempts: { increment: 1 } },
-      });
       const attemptsLeft = OTP_MAX_ATTEMPTS - (record.attempts + 1);
       if (attemptsLeft > 0) {
         throw new BadRequestException({
@@ -221,14 +267,15 @@ export class AuthService {
           code: 'OTP_WRONG',
         });
       }
-      throw new BadRequestException({
-        message: 'Bạn đã nhập sai quá nhiều lần. Vui lòng gửi lại mã mới',
-        code: 'OTP_LOCKED',
-      });
+      throw lockedError;
     }
 
     const marked = await this.prisma.passwordResetOtp.updateMany({
-      where: { id: record.id, consumedAt: null },
+      where: {
+        id: record.id,
+        consumedAt: null,
+        expiresAt: { gt: new Date() },
+      },
       data: { consumedAt: new Date() },
     });
     if (marked.count === 0) {
@@ -236,7 +283,11 @@ export class AuthService {
     }
 
     const resetToken = await this.jwtService.signAsync(
-      { sub: user.id, purpose: 'password_reset' },
+      {
+        sub: user.id,
+        purpose: 'password_reset',
+        resetVersion: user.resetVersion,
+      },
       { secret: this.getResetTokenSecret(), expiresIn: '10m' },
     );
 
@@ -246,7 +297,7 @@ export class AuthService {
   // Đặt mật khẩu mới bằng resetToken.
   async resetPassword(dto: ResetPasswordDto) {
     // Kiểm tra chữ ký + hạn của resetToken.
-    let payload: { sub: number; purpose?: string };
+    let payload: { sub: number; purpose?: string; resetVersion?: number };
     try {
       payload = await this.jwtService.verifyAsync(dto.resetToken, {
         secret: this.getResetTokenSecret(),
@@ -257,14 +308,23 @@ export class AuthService {
       );
     }
 
-    if (payload.purpose !== 'password_reset') {
+    if (
+      payload.purpose !== 'password_reset' ||
+      typeof payload.resetVersion !== 'number' ||
+      !Number.isInteger(payload.resetVersion) ||
+      payload.resetVersion < 0
+    ) {
       throw new UnauthorizedException('resetToken không hợp lệ');
     }
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
     });
-    if (!user || user.deletedAt !== null) {
+    if (
+      !user ||
+      user.deletedAt !== null ||
+      user.resetVersion !== payload.resetVersion
+    ) {
       throw new UnauthorizedException('Tài khoản không tồn tại');
     }
 
@@ -274,10 +334,18 @@ export class AuthService {
       throw new BadRequestException('Mật khẩu mới không được trùng mật khẩu cũ');
     }
 
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { passwordHash: await hash(dto.newPassword, BCRYPT_ROUNDS) },
+    const updated = await this.prisma.user.updateMany({
+      where: { id: user.id, resetVersion: payload.resetVersion },
+      data: {
+        passwordHash: await hash(dto.newPassword, BCRYPT_ROUNDS),
+        resetVersion: { increment: 1 },
+      },
     });
+    if (updated.count === 0) {
+      throw new UnauthorizedException(
+        'Phiên đặt lại mật khẩu đã hết hạn. Vui lòng thực hiện lại từ đầu',
+      );
+    }
 
     return { message: 'Đặt lại mật khẩu thành công' };
   }

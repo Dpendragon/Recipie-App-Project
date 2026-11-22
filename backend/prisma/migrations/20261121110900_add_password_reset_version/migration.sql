@@ -1,0 +1,2 @@
+ALTER TABLE `users`
+ADD COLUMN `reset_version` INTEGER NOT NULL DEFAULT 0;
