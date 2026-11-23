@@ -27,31 +27,6 @@ export const radius = {
   pill: 100, // nút bấm bo tròn hoàn toàn
 } as const;
 
-// Đổ bóng.
-export const shadows: Record<
-  'soft' | 'pill' | 'ctaWelcome' | 'ctaSignIn',
-  BoxShadowValue[]
-> = {
-  // Bóng nhẹ dùng cho thẻ form, nút quay lại, nút Google/Apple, nút Đăng ký.
-  soft: [
-    { offsetX: 0, offsetY: 4, blurRadius: 16, spreadDistance: -2, color: 'rgba(46,33,24,0.06)' },
-    { offsetX: 0, offsetY: 1, blurRadius: 4, spreadDistance: -1, color: 'rgba(46,33,24,0.03)' },
-  ],
-  // Bóng cho 2 viên thuốc tính năng ở màn hình chào mừng.
-  pill: [
-    { offsetX: 0, offsetY: 12, blurRadius: 32, spreadDistance: -4, color: 'rgba(46,33,24,0.08)' },
-    { offsetX: 0, offsetY: 2, blurRadius: 6, spreadDistance: -1, color: 'rgba(46,33,24,0.04)' },
-  ],
-  // Bóng cam của nút "Đăng ký" ở màn hình chào mừng.
-  ctaWelcome: [
-    { offsetX: 0, offsetY: 8, blurRadius: 24, spreadDistance: -2, color: 'rgba(232,115,74,0.35)' },
-  ],
-  // Bóng của nút "Đăng nhập" trong form.
-  ctaSignIn: [
-    { offsetX: 0, offsetY: 12, blurRadius: 32, spreadDistance: -4, color: 'rgba(46,33,24,0.1)' },
-  ],
-};
-
 // ---------------------------------------------------------------------------
 // Bộ thiết kế tông xanh (Figma Page 1) — dùng cho các màn Mua sắm, Kế hoạch...
 // Giữ riêng với bảng màu cam ở trên để các màn đăng nhập/đăng ký không bị đổi.
