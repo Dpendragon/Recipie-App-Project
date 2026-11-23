@@ -1,5 +1,5 @@
 export type IconAsset = {
-  source: number; // kết quả của require(...) là một số định danh của ảnh
+  source: number;
   width: number;
   height: number;
 };
@@ -65,9 +65,25 @@ export const icons = {
   ellipsis: icon(require('../../assets/icons/ellipsis.svg'), 18, 18),
   calendarSmall: icon(require('../../assets/icons/calendar-small.svg'), 19, 19),
   circleCheckSmall: icon(require('../../assets/icons/circle-check-small.svg'), 17, 17),
+  sprout: icon(require('../../assets/icons/ac-sprout.svg'), 28, 28), // logo mầm cây
+  user: icon(require('../../assets/icons/ac-user.svg'), 19, 19),
+  mail: icon(require('../../assets/icons/ac-mail.svg'), 19, 19),
+  eye: icon(require('../../assets/icons/ac-eye.svg'), 19, 19), // đang hiện mật khẩu
+  eyeOff: icon(require('../../assets/icons/ac-eye-off.svg'), 19, 19), // đang ẩn mật khẩu
+  squareCheck: icon(require('../../assets/icons/ac-square-check.svg'), 21, 21), // ô tick (đã chọn)
+  square: icon(require('../../assets/icons/ac-square.svg'), 21, 21), // ô tick (chưa chọn)
+  arrowRight: icon(require('../../assets/icons/ac-arrow-right.svg'), 19, 19),
+  arrowLeft: icon(require('../../assets/icons/ac-arrow-left.svg'), 22, 22),
+  shieldCheck: icon(require('../../assets/icons/ac-shield-check.svg'), 14, 14),
+  mailCheck: icon(require('../../assets/icons/ac-mail-check.svg'), 18, 18),
+  mailCheckRed: icon(require('../../assets/icons/ac-mail-check-red.svg'), 18, 18),
+  lock: icon(require('../../assets/icons/ac-lock.svg'), 18, 18),
+  info: icon(require('../../assets/icons/ac-info.svg'), 18, 18),
+  utensils: icon(require('../../assets/icons/ac-utensils.svg'), 18, 18), // dao nĩa (màn Chào mừng)
 };
 
 export const images = {
-  // Ảnh bàn tiệc ở nửa trên màn hình Chào mừng.
+  // Ảnh bìa màn Chào mừng
   welcomeHero: require('../../assets/images/welcome-hero.png') as number,
+  loginHero: require('../../assets/images/welcome-hero.png') as number,
 };

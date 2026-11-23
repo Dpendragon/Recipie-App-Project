@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/inter';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { SessionCheckScreen } from '@/components/auth/SessionCheckScreen';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { useAuth } from '@/hooks/useAuth';
 import { SplashScreenController } from '@/splash';
@@ -50,6 +51,10 @@ export default function RootLayout() {
 function RootNavigator() {
   const { status, retry } = useAuth();
 
+  if (status === 'loading') {
+    return <SessionCheckScreen />;
+  }
+
   if (status === 'offline') {
     return <OfflineNotice onRetry={retry} />;
   }
@@ -67,7 +72,6 @@ function RootNavigator() {
   );
 }
 
-// Màn hình "Mất kết nối" khi không xác minh được phiên đăng nhập.
 function OfflineNotice({ onRetry }: { onRetry: () => void }) {
   return (
     <View style={styles.container}>
@@ -92,7 +96,7 @@ const styles = StyleSheet.create({
     gap: 12,
     backgroundColor: colors.background,
   },
-  title: { fontFamily: fonts.heading, fontSize: 22, color: colors.textDark },
+  title: { fontFamily: fonts.bold, fontSize: 22, color: colors.textDark },
   message: {
     fontFamily: fonts.regular,
     fontSize: 14,

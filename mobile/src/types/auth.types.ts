@@ -29,3 +29,13 @@ export interface LoginResponse {
   accessToken: string;
   user: User;
 }
+
+// POST /auth/forgot-password và POST /auth/reset-password đều trả về { message }.
+export interface MessageResponse {
+  message: string;
+}
+
+// POST /auth/verify-reset-otp trả về resetToken (JWT sống 10 phút).
+export interface VerifyResetOtpResponse {
+  resetToken: string;
+}

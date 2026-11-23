@@ -1,35 +1,30 @@
-import type { BoxShadowValue } from 'react-native';
+// Bảng màu, font, bo góc của app
 
 export const colors = {
-  background: '#FFF8F5', // nền kem ấm của mọi màn hình
-  surface: '#FFFFFF', // nền thẻ (card), nút trắng
-  primary: '#E8734A', // cam chủ đạo (nút bấm chính, link nhấn mạnh)
-  brand: '#A23F1A', // nâu đỏ (logo chữ, tiêu đề thương hiệu, link điều khoản)
-  textDark: '#251910', // chữ đậm (tiêu đề, nhãn)
-  textMid: '#57423B', // chữ vừa (mô tả)
-  textMuted: '#8A726A', // chữ mờ (chú thích)
-  placeholder: 'rgba(138,114,106,0.7)', // chữ gợi ý trong ô nhập
-  inputFill: '#FFF1E9', // nền ô nhập (đăng ký)
-  inputFillSoft: 'rgba(255,241,233,0.4)', // nền ô nhập (đăng nhập)
-  green: '#466824', // chấm xanh ở huy hiệu màn hình chào mừng
-  error: '#BA1A1A', // chữ & viền báo lỗi
-  errorBg: '#FDECEA',
-  successBg: '#E8F3DC',
+  background: '#F8F6EF', // nền kem của mọi màn hình
+  surface: '#FFFFFF', // nền ô nhập, ô OTP
+  primary: '#286044', // xanh lá đậm: nút chính, link, logo
+  textDark: '#243C2D', // chữ đậm (tiêu đề, nhãn)
+  textMid: '#546255', // chữ vừa (mô tả)
+  textMuted: '#758074', // chữ mờ, icon trong ô nhập, chú thích
+  border: '#E1E5D9', // viền ô nhập
+  softGreen: '#E7EEDF', // nền xanh nhạt (banner, thông báo thành công)
+  error: '#AE4E3D', // chữ và viền báo lỗi
+  errorBg: '#F7EDEC', // nền thông báo lỗi
   white: '#FFFFFF',
 } as const;
 
-// Quicksand dùng cho tiêu đề, Be Vietnam Pro dùng cho nội dung (hỗ trợ tốt tiếng Việt).
+// Toàn bộ app dùng font Inter.
 export const fonts = {
-  heading: 'Quicksand_700Bold',
-  regular: 'BeVietnamPro_400Regular',
-  medium: 'BeVietnamPro_500Medium',
-  semiBold: 'BeVietnamPro_600SemiBold',
-  bold: 'BeVietnamPro_700Bold',
+  regular: 'Inter_400Regular',
+  semiBold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
 } as const;
 
-// "Pill" = hình viên thuốc: bo tròn hoàn toàn 2 đầu (radius rất lớn).
 export const radius = {
-  pill: 9999,
+  input: 10, // ô nhập, thông báo
+  hero: 28, // ảnh lớn, banner xanh
+  pill: 100, // nút bấm bo tròn hoàn toàn
 } as const;
 
 // Đổ bóng.
