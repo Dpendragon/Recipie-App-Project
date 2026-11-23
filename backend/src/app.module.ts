@@ -4,12 +4,18 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
+import { ShoppingItemsModule } from './shopping-items/shopping-items.module';
+import { MealPlanModule } from './meal-plan/meal-plan.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
+    ShoppingItemsModule,
+    MealPlanModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
