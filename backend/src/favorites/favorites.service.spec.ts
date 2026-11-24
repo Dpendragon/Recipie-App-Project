@@ -238,4 +238,96 @@ describe('FavoritesService', () => {
     });
   });
 
+  describe('list (UC-10)', () => {
+    it('phân trang trả hasMore và nextCursor đúng', async () => {
+      // take = limit + 1 nên có 3 dòng cho limit 2.
+      prismaMock.favorite.findMany.mockResolvedValue([
+        favoriteRow({ id: 30, source: RecipeSource.SPOONACULAR }),
+        favoriteRow({ id: 20, source: RecipeSource.SPOONACULAR }),
+        favoriteRow({ id: 10, source: RecipeSource.SPOONACULAR }),
+      ]);
+
+      const result = await service.list(9, { limit: 2, cursor: 40 });
+
+      expect(result.data.map((item) => item.id)).toEqual([30, 20]);
+      expect(result.meta).toEqual({ nextCursor: 20, hasMore: true });
+      expect(prismaMock.favorite.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { userId: 9 },
+          orderBy: { id: 'desc' },
+          take: 3,
+          cursor: { id: 40 },
+          skip: 1,
+        }),
+      );
+    });
+
+    it('trang cuối trả hasMore false và nextCursor null', async () => {
+      prismaMock.favorite.findMany.mockResolvedValue([
+        favoriteRow({ id: 30, source: RecipeSource.SPOONACULAR }),
+        favoriteRow({ id: 20, source: RecipeSource.SPOONACULAR }),
+      ]);
+
+      const result = await service.list(9, { limit: 2 });
+
+      expect(result.data).toHaveLength(2);
+      expect(result.meta).toEqual({ nextCursor: null, hasMore: false });
+      // Không có cursor thì không gửi skip.
+      expect(prismaMock.favorite.findMany).toHaveBeenCalledWith(
+        expect.not.objectContaining({ skip: 1 }),
+      );
+    });
+
+    it('LOCAL ưu tiên dữ liệu sống, thiếu recipe thì rơi về snapshot', async () => {
+      prismaMock.favorite.findMany.mockResolvedValue([
+        favoriteRow({ id: 30, recipeId: '7', titleSnapshot: 'Tên cũ' }),
+        favoriteRow({
+          id: 20,
+          recipeId: '8',
+          titleSnapshot: 'Món đã xoá',
+          imageSnapshot: 'https://cdn/cu.jpg',
+        }),
+      ]);
+      // Chỉ recipe 7 còn tồn tại.
+      prismaMock.recipe.findMany.mockResolvedValue([
+        { id: 7, title: 'Tên mới', imageUrl: 'https://cdn/moi.jpg' },
+      ]);
+
+      const result = await service.list(9, {});
+
+      expect(result.data[0]).toEqual({
+        id: 30,
+        recipeId: '7',
+        source: RecipeSource.LOCAL,
+        title: 'Tên mới',
+        imageUrl: 'https://cdn/moi.jpg',
+        createdAt: NOW,
+      });
+      expect(result.data[1]).toEqual({
+        id: 20,
+        recipeId: '8',
+        source: RecipeSource.LOCAL,
+        title: 'Món đã xoá',
+        imageUrl: 'https://cdn/cu.jpg',
+        createdAt: NOW,
+      });
+      // Gom id trong một truy vấn, không dùng include.
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledTimes(1);
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ where: { id: { in: [7, 8] } } }),
+      );
+    });
+
+    it('không truy vấn recipes khi danh sách chỉ có SPOONACULAR', async () => {
+      prismaMock.favorite.findMany.mockResolvedValue([
+        favoriteRow({ id: 30, source: RecipeSource.SPOONACULAR }),
+      ]);
+
+      await service.list(9, {});
+
+      expect(prismaMock.recipe.findMany).not.toHaveBeenCalled();
+    });
+  });
+
+
 });
