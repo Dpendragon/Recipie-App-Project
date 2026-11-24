@@ -141,10 +141,15 @@ export class FavoritesService {
       throw new NotFoundException('Không tìm thấy công thức');
     }
 
+    // "7" và "007" phải ra cùng một dòng qua UNIQUE nên LOCAL chuẩn hoá ngay từ
+    // đầu: cùng một giá trị dùng cho findUnique, cho upsert và cho lúc ghi, nên
+    // recipe_id đã lưu luôn khớp với String(recipes.id) khi đọc dữ liệu sống.
+    const recipeId = normalizeRecipeId(dto.recipeId, dto.source);
+
     // Không qua RecipesService: ở đây chỉ cần tên và ảnh, không cần nguyên liệu,
     // dinh dưỡng hay rating của màn chi tiết.
     const recipe = await this.prisma.recipe.findUnique({
-      where: { id: Number(dto.recipeId) },
+      where: { id: Number(recipeId) },
       select: { title: true, imageUrl: true },
     });
 
@@ -152,9 +157,8 @@ export class FavoritesService {
       throw new NotFoundException('Không tìm thấy công thức');
     }
 
-    // "7" và "007" phải ra cùng một dòng qua UNIQUE nên LOCAL luôn chuẩn hoá.
     return {
-      recipeId: normalizeRecipeId(dto.recipeId, dto.source),
+      recipeId,
       titleSnapshot: recipe.title,
       imageSnapshot: recipe.imageUrl,
     };

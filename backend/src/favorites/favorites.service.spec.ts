@@ -13,6 +13,7 @@ const prismaMock = {
     create: jest.fn(),
     findUnique: jest.fn(),
     findMany: jest.fn(),
+    delete: jest.fn(),
     deleteMany: jest.fn(),
   },
   recipe: {
@@ -148,6 +149,38 @@ describe('FavoritesService', () => {
       );
     });
 
+    // Chuẩn hoá phải xảy ra trước khi ghi, nếu không recipe_id đã lưu ("007")
+    // sẽ không khớp String(recipes.id) ("7") và đọc sống rơi nhầm về snapshot.
+    it('id đã chuẩn hoá lúc ghi khớp với đọc sống ở list', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue({
+        title: 'Phở bò',
+        imageUrl: null,
+      });
+      prismaMock.favorite.upsert.mockImplementation(
+        ({ create }: { create: { recipeId: string } }) =>
+          Promise.resolve(favoriteRow({ id: 30, recipeId: create.recipeId })),
+      );
+
+      const saved = await service.create(9, dto({ recipeId: '007' }));
+      expect(saved.recipeId).toBe('7');
+
+      // Đọc lại đúng dòng vừa ghi: recipes.id = 7 phải ghép được dữ liệu sống.
+      prismaMock.favorite.findMany.mockResolvedValue([
+        favoriteRow({
+          id: 30,
+          recipeId: saved.recipeId,
+          titleSnapshot: 'Tên cũ',
+        }),
+      ]);
+      prismaMock.recipe.findMany.mockResolvedValue([
+        { id: 7, title: 'Tên mới', imageUrl: null },
+      ]);
+
+      const result = await service.list(9, {});
+
+      expect(result.data[0].title).toBe('Tên mới');
+    });
+
     it('id LOCAL không phải số trả 404', async () => {
       await expect(service.create(9, dto({ recipeId: 'abc' }))).rejects.toThrow(
         NotFoundException,
@@ -157,6 +190,19 @@ describe('FavoritesService', () => {
       expect(prismaMock.recipe.findUnique).not.toHaveBeenCalled();
       expect(prismaMock.favorite.upsert).not.toHaveBeenCalled();
     });
+
+    // Number() nuốt được các dạng này nên nếu thiếu isLocalId thì chúng lọt
+    // xuống findUnique thành NaN hoặc sai id.
+    it.each(['7abc', '1.5', '-3', '1e3', '0x7'])(
+      'id LOCAL "%s" trả 404 chứ không ép kiểu',
+      async (recipeId) => {
+        await expect(service.create(9, dto({ recipeId }))).rejects.toThrow(
+          NotFoundException,
+        );
+        expect(prismaMock.recipe.findUnique).not.toHaveBeenCalled();
+        expect(prismaMock.favorite.upsert).not.toHaveBeenCalled();
+      },
+    );
 
     it('LOCAL không tồn tại trong recipes trả 404', async () => {
       prismaMock.recipe.findUnique.mockResolvedValue(null);
@@ -354,6 +400,19 @@ describe('FavoritesService', () => {
       expect(prismaMock.favorite.deleteMany).toHaveBeenCalledWith({
         where: { id: 1, userId: 9 },
       });
+    });
+
+    // UC-11 không có nhánh 403: không đọc trước rồi so chủ sở hữu, mà xoá thẳng
+    // bằng deleteMany lọc userId. Chạm tới favorite.delete hay findUnique nghĩa
+    // là nhánh ForbiddenException đã quay lại.
+    it('không đọc trước và không dùng delete đơn lẻ', async () => {
+      prismaMock.favorite.deleteMany.mockResolvedValue({ count: 0 });
+
+      await service.remove(9, 123);
+
+      expect(prismaMock.favorite.findUnique).not.toHaveBeenCalled();
+      expect(prismaMock.favorite.delete).not.toHaveBeenCalled();
+      expect(prismaMock.favorite.deleteMany).toHaveBeenCalledTimes(1);
     });
   });
 });
