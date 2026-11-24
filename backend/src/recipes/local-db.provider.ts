@@ -1,7 +1,9 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { RecipeSource } from '../generated/prisma/enums';
+import { DELETED_AUTHOR_NAME } from '../reviews/reviews.service';
 import type {
+  RecipeAuthor,
   RecipeDetail,
   RecipeProvider,
 } from './recipe-provider.interface';
@@ -12,6 +14,18 @@ export function splitSteps(steps: string): string[] {
     .split(/\r\n|\r|\n/)
     .map((line) => line.trim())
     .filter(Boolean);
+}
+
+// Tác giả đã xoá mềm thì coi như không có tác giả (UC-08).
+// Còn tài khoản nhưng chưa đặt tên thì hiển thị tên mặc định.
+function toAuthor(
+  author: { id: number; name: string | null; deletedAt: Date | null } | null,
+): RecipeAuthor | null {
+  if (!author || author.deletedAt !== null) return null;
+  return {
+    id: author.id,
+    name: author.name?.trim() ? author.name.trim() : DELETED_AUTHOR_NAME,
+  };
 }
 
 // JSON trong DB có thể là bất cứ thứ gì: chỉ nhận mảng chuỗi, còn lại trả null.
@@ -40,7 +54,10 @@ export class LocalDbProvider implements RecipeProvider {
 
     const recipe = await this.prisma.recipe.findUnique({
       where: { id: localId },
-      include: { ingredients: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        ingredients: { orderBy: { sortOrder: 'asc' } },
+        author: { select: { id: true, name: true, deletedAt: true } },
+      },
     });
 
     if (!recipe) {
@@ -68,6 +85,7 @@ export class LocalDbProvider implements RecipeProvider {
       })),
       nutrition: recipe.nutrition ?? null,
       nutritionCoverage: recipe.nutritionCoverage,
+      author: toAuthor(recipe.author),
     };
   }
 }

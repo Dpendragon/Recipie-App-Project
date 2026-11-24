@@ -20,6 +20,7 @@ const recipeRow = {
   videoUrl: null,
   nutrition: { calories: 500 },
   nutritionCoverage: 'FULL',
+  author: { id: 3, name: 'Nam', deletedAt: null },
   ingredients: [
     {
       id: 10,
@@ -65,7 +66,10 @@ describe('LocalDbProvider', () => {
 
     expect(prismaMock.recipe.findUnique).toHaveBeenCalledWith({
       where: { id: 1 },
-      include: { ingredients: { orderBy: { sortOrder: 'asc' } } },
+      include: {
+        ingredients: { orderBy: { sortOrder: 'asc' } },
+        author: { select: { id: true, name: true, deletedAt: true } },
+      },
     });
     expect(result).toEqual({
       id: '1',
@@ -98,6 +102,7 @@ describe('LocalDbProvider', () => {
       ],
       nutrition: { calories: 500 },
       nutritionCoverage: 'FULL',
+      author: { id: 3, name: 'Nam' },
     });
     // id trả về là chuỗi để khớp recipe_id VARCHAR.
     expect(typeof result.id).toBe('string');
@@ -132,6 +137,44 @@ describe('LocalDbProvider', () => {
 
     expect(result.diets).toBeNull();
     expect(result.dishTypes).toBeNull();
+  });
+
+  describe('author', () => {
+    it('tác giả đã xoá mềm thì author là null', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue({
+        ...recipeRow,
+        author: { id: 3, name: 'Nam', deletedAt: new Date() },
+      });
+
+      const result = await provider.getById('1');
+
+      expect(result.author).toBeNull();
+    });
+
+    it('không đọc được tác giả thì author là null', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue({
+        ...recipeRow,
+        author: null,
+      });
+
+      const result = await provider.getById('1');
+
+      expect(result.author).toBeNull();
+    });
+
+    it.each([null, '   '])(
+      'name rỗng (%s) thì dùng tên mặc định',
+      async (name) => {
+        prismaMock.recipe.findUnique.mockResolvedValue({
+          ...recipeRow,
+          author: { id: 3, name, deletedAt: null },
+        });
+
+        const result = await provider.getById('1');
+
+        expect(result.author).toEqual({ id: 3, name: 'Người dùng' });
+      },
+    );
   });
 
   describe('splitSteps', () => {

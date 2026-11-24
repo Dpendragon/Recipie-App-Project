@@ -2,6 +2,7 @@ import type {
   NutritionCoverage,
   RecipeSource,
 } from '../generated/prisma/enums';
+import type { RatingSummary } from '../reviews/reviews.service';
 
 // Hợp đồng chung cho mọi nguồn công thức (DB nội bộ, Spoonacular...).
 // Giữ interface nhỏ: người làm tìm kiếm sẽ bổ sung search(...) sau.
@@ -14,6 +15,12 @@ export type RecipeIngredientDetail = {
   quantity: number | null;
   unit: string | null;
   sortOrder: number;
+};
+
+// Tác giả chỉ có ở nguồn nội bộ; Spoonacular luôn null.
+export type RecipeAuthor = {
+  id: number;
+  name: string;
 };
 
 export type RecipeDetail = {
@@ -32,6 +39,15 @@ export type RecipeDetail = {
   // Trả nguyên khối JSON của cột nutrition, null khi chưa có.
   nutrition: unknown;
   nutritionCoverage: NutritionCoverage | null;
+  // null khi nguồn không có tác giả hoặc tác giả đã bị xoá mềm.
+  author: RecipeAuthor | null;
+};
+
+// Response của GET /recipes/:id: dữ liệu nguồn cộng phần phụ thuộc người dùng.
+export type RecipeDetailResponse = RecipeDetail & {
+  rating: RatingSummary;
+  // id dòng favorites của chính người đang đăng nhập, null khi chưa lưu.
+  favoriteId: number | null;
 };
 
 export interface RecipeProvider {
