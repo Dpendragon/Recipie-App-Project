@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { RecipeSource } from '../generated/prisma/enums';
 import { resolveLimit } from '../common/dto/pagination.dto';
+import { isLocalId, normalizeRecipeId } from '../common/utils/recipe-id';
 import { CreateReviewDto } from './dto/create-review.dto';
 
 // Tên hiển thị khi users.name NULL hoặc tác giả đã bị xoá mềm.
@@ -56,17 +57,6 @@ type MyReviewRow = {
   createdAt: Date;
   updatedAt: Date;
 };
-
-// recipes.id là Int nhưng recipe_id ở đây là VARCHAR dùng chung với Spoonacular.
-function isLocalId(id: string): boolean {
-  return /^\d+$/.test(id);
-}
-
-// "7" và "007" sẽ tạo hai dòng khác nhau qua UNIQUE nên LOCAL phải chuẩn hoá.
-function normalizeRecipeId(id: string, source: RecipeSource): string {
-  if (source !== RecipeSource.LOCAL) return id;
-  return isLocalId(id) ? String(Number(id)) : id;
-}
 
 function authorName(user: ReviewRow['user']): string {
   if (!user || user.deletedAt !== null) {
