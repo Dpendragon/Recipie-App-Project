@@ -329,5 +329,31 @@ describe('FavoritesService', () => {
     });
   });
 
+  describe('remove (UC-11)', () => {
+    it('xoá bản ghi không tồn tại không báo lỗi', async () => {
+      prismaMock.favorite.deleteMany.mockResolvedValue({ count: 0 });
 
+      await expect(service.remove(9, 123)).resolves.toBeUndefined();
+    });
+
+    it('user A không xoá được favorite của user B', async () => {
+      prismaMock.favorite.deleteMany.mockResolvedValue({ count: 0 });
+
+      // Không lỗi, nhưng cũng không tiết lộ bản ghi đó có tồn tại hay không.
+      await expect(service.remove(9, 123)).resolves.toBeUndefined();
+      // userId luôn nằm trong where nên dòng của người khác không khớp.
+      expect(prismaMock.favorite.deleteMany).toHaveBeenCalledWith({
+        where: { id: 123, userId: 9 },
+      });
+    });
+
+    it('xoá đúng bản ghi của mình', async () => {
+      prismaMock.favorite.deleteMany.mockResolvedValue({ count: 1 });
+
+      await expect(service.remove(9, 1)).resolves.toBeUndefined();
+      expect(prismaMock.favorite.deleteMany).toHaveBeenCalledWith({
+        where: { id: 1, userId: 9 },
+      });
+    });
+  });
 });

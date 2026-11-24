@@ -1,7 +1,12 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseIntPipe,
   Post,
   Query,
 } from '@nestjs/common';
@@ -29,5 +34,11 @@ export class FavoritesController {
     return this.favoritesService.create(user.id, dto);
   }
 
-
+  // DELETE /favorites/:id (UC-11). :id là id của dòng favorites, không phải
+  // recipe_id, nên ép kiểu số được ngay ở đây.
+  @Delete(':id')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {
+    return this.favoritesService.remove(user.id, id);
+  }
 }

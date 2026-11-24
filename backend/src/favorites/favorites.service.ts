@@ -109,6 +109,13 @@ export class FavoritesService {
     };
   }
 
+  // UC-11. Ngoại lệ 2a: đã bỏ lưu từ trước thì coi như hoàn tất, không báo lỗi.
+  // Lọc thêm userId nên favorite của người khác cũng không xoá được, và vì luôn
+  // trả 204 nên người gọi không suy ra được bản ghi đó có tồn tại hay không.
+  async remove(userId: number, id: number): Promise<void> {
+    await this.prisma.favorite.deleteMany({ where: { id, userId } });
+  }
+
   // LOCAL: kiểm tra công thức tồn tại và lấy snapshot từ bảng recipes;
   // SPOONACULAR: dùng dữ liệu client gửi, titleSnapshot là bắt buộc.
   private async resolveRecipe(dto: CreateFavoriteDto): Promise<{
