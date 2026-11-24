@@ -24,6 +24,19 @@ export const icons = {
   lock: icon(require('../../assets/icons/ac-lock.svg'), 18, 18),
   info: icon(require('../../assets/icons/ac-info.svg'), 18, 18),
   utensils: icon(require('../../assets/icons/ac-utensils.svg'), 18, 18), // dao nĩa (màn Chào mừng)
+
+  // Chi tiết công thức (UC-08)
+  clock: icon(require('../../assets/icons/rd-clock.svg'), 21, 21), // thời gian nấu
+  users: icon(require('../../assets/icons/rd-users.svg'), 21, 21), // số khẩu phần
+  flame: icon(require('../../assets/icons/rd-flame.svg'), 21, 21), // năng lượng (kcal)
+  recipeNotFound: icon(require('../../assets/icons/rd-not-found.svg'), 34, 34),
+  recipeOffline: icon(require('../../assets/icons/rd-offline.svg'), 34, 34),
+  heart: icon(require('../../assets/icons/rd-heart.svg'), 20, 20), // nút Yêu thích
+  circleCheck: icon(require('../../assets/icons/rd-circle-check.svg'), 17, 17), // nguyên liệu đã có
+  circlePlus: icon(require('../../assets/icons/rd-circle-plus.svg'), 17, 17), // nguyên liệu cần mua
+  cart: icon(require('../../assets/icons/rd-cart.svg'), 19, 19), // thêm vào danh sách mua sắm
+  calendar: icon(require('../../assets/icons/rd-calendar.svg'), 19, 19), // thêm vào kế hoạch bữa ăn
+  play: icon(require('../../assets/icons/rd-play.svg'), 22, 22), // nút phát video
 };
 
 export const images = {
