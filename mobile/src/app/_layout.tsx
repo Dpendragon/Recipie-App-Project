@@ -4,6 +4,7 @@ import { Inter_400Regular, Inter_600SemiBold, Inter_700Bold } from '@expo-google
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SessionCheckScreen } from '@/components/auth/SessionCheckScreen';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { NetworkProvider } from '@/contexts/NetworkContext';
 import { useAuth } from '@/hooks/useAuth';
 import { SplashScreenController } from '@/splash';
 import { colors, fonts, radius } from '@/constants/theme';
@@ -20,10 +21,12 @@ export default function RootLayout() {
   }
 
   return (
-    <AuthProvider>
-      <SplashScreenController />
-      <RootNavigator />
-    </AuthProvider>
+    <NetworkProvider>
+      <AuthProvider>
+        <SplashScreenController />
+        <RootNavigator />
+      </AuthProvider>
+    </NetworkProvider>
   );
 }
 
