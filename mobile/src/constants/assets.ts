@@ -45,6 +45,10 @@ export const icons = {
   cloudOff: icon(require('../../assets/icons/fv-cloud-off.svg'), 18, 18), // banner cần mạng để dùng thêm
   toastCheck: icon(require('../../assets/icons/fv-toast-check.svg'), 19, 19), // dấu tick trên toast
   calendarGreen: icon(require('../../assets/icons/fv-calendar.svg'), 19, 19), // nút phụ "Thêm món vào kế hoạch"
+
+  // Đánh giá (UC-12 → UC-16)
+  starOutline: icon(require('../../assets/icons/rv-star-outline.svg'), 35, 35), // sao chưa chọn
+  starFilled: icon(require('../../assets/icons/rv-star-filled.svg'), 35, 35), // sao đã chọn
 };
 
 export const images = {

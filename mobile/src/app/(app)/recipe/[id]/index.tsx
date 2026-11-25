@@ -1,4 +1,4 @@
-import { useRef, useEffect, useState } from 'react';
+import { useCallback, useRef, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image';
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { ActionButton } from '@/components/common/ActionButton';
 import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
@@ -25,6 +25,7 @@ import { useCurrentUserId } from '@/hooks/useCurrentUserId';
 import { useNetwork } from '@/hooks/useNetwork';
 import { useToast } from '@/hooks/useToast';
 import { getById } from '@/services/api/recipeApi';
+import { listByRecipe } from '@/services/api/reviewApi';
 import {
   getRecipeDetail,
   OfflineCacheMissError,
@@ -40,6 +41,7 @@ import type {
   RecipeRating,
   RecipeSource,
 } from '@/types/recipe.types';
+import type { Review } from '@/types/review.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
 // Màn hình chỉ có 5 trạng thái; 'offline' và 'notFound' là hai nhánh ngoại lệ của UC-08.
@@ -234,6 +236,8 @@ export default function RecipeDetailScreen() {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; state: Settled } | null>(null);
   const [favoriteOverride, setFavoriteOverride] = useState<FavoriteState | null>(null);
+  // Đánh giá nổi bật của khối "Cả nhà nói gì?" (UC-13, lấy 1 dòng).
+  const [featured, setFeatured] = useState<{ key: string; review: Review | null } | null>(null);
   // Chặn bấm tim liên tiếp khi yêu cầu trước chưa xong.
   const favoritePendingRef = useRef(false);
 
@@ -258,6 +262,25 @@ export default function RecipeDetailScreen() {
       ? favoriteOverride
       : initialFavorite(requestKey, data)
     : null;
+  const featuredReview = featured?.key === requestKey ? featured.review : null;
+
+  // Tải ngầm đánh giá nổi bật (UC-13, limit=1): ưu tiên đánh giá của mình, không
+  // có thì lấy dòng mới nhất. Mất mạng thì bỏ qua, khối đánh giá về trạng thái rỗng.
+  const loadFeatured = useCallback(
+    (key: string, signal: { cancelled: boolean }) => {
+      if (!id || !isOnline) return;
+      void listByRecipe(id, source, undefined, 1)
+        .then((reviews) => {
+          if (!signal.cancelled) {
+            setFeatured({ key, review: reviews.mine ?? reviews.data[0] ?? null });
+          }
+        })
+        .catch(() => {
+          // Lỗi đánh giá không được làm hỏng phần còn lại của màn chi tiết.
+        });
+    },
+    [id, isOnline, source],
+  );
 
   useEffect(() => {
     if (!id || userId === undefined) return;
@@ -276,7 +299,64 @@ export default function RecipeDetailScreen() {
     };
   }, [id, isOnline, requestKey, source, userId]);
 
+  useEffect(() => {
+    if (!id || userId === undefined) return;
+
+    const signal = { cancelled: false };
+    loadFeatured(requestKey, signal);
+
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [id, loadFeatured, requestKey, userId]);
+
+  // Quay lại từ màn đánh giá: điểm trung bình có thể đã đổi (UC-12, UC-15, UC-16)
+  // nên tải lại ngầm, giữ nội dung đang hiển thị thay vì nhấp nháy về trạng thái tải.
+  const focusedKeyRef = useRef<string | null>(null);
+  useFocusEffect(
+    useCallback(() => {
+      // Lần focus đầu của mỗi requestKey đã có effect bên trên tải.
+      if (focusedKeyRef.current !== requestKey) {
+        focusedKeyRef.current = requestKey;
+        return;
+      }
+      if (!id || userId === undefined) return;
+
+      const signal = { cancelled: false };
+      void loadRecipe(userId, id, source, isOnline)
+        .then((loaded) => {
+          if (!signal.cancelled) {
+            setResult({ key: requestKey, state: { kind: 'ready', data: loaded } });
+          }
+        })
+        .catch(() => {
+          // Tải lại ngầm thất bại: giữ nguyên dữ liệu cũ, không đổi trạng thái màn hình.
+        });
+      loadFeatured(requestKey, signal);
+
+      return () => {
+        signal.cancelled = true;
+      };
+    }, [id, isOnline, loadFeatured, requestKey, source, userId]),
+  );
+
   const retry = () => setAttempt((value) => value + 1);
+
+  // Màn đánh giá cần tên và ảnh món để dựng thẻ ở đầu màn và để gửi snapshot
+  // cho công thức Spoonacular; truyền sẵn từ dữ liệu đang hiển thị.
+  const openReviews = () => {
+    if (!id || !data) return;
+    const view = toViewRecipe(data);
+    router.push({
+      pathname: '/recipe/[id]/reviews',
+      params: {
+        id,
+        source,
+        title: view.title,
+        ...(view.imageUrl ? { imageUrl: view.imageUrl } : null),
+      },
+    });
+  };
 
   // UC-09 / UC-11: cập nhật lạc quan, hoàn tác và báo toast khi lỗi.
   // Cache được ghi/xoá bên trong cacheManager, chỉ sau khi server đã nhận.
@@ -397,6 +477,8 @@ export default function RecipeDetailScreen() {
           // Đã lưu mà thiếu favorite_id (bản lưu cũ khi ngoại tuyến): tắt bỏ lưu.
           unsaveBlocked={favorite.saved && favorite.favoriteId === null}
           onToggleFavorite={() => void toggleFavorite()}
+          featuredReview={featuredReview}
+          onOpenReviews={openReviews}
         />
       ) : null}
 
@@ -414,6 +496,9 @@ type RecipeBodyProps = {
   isSaved: boolean;
   unsaveBlocked: boolean;
   onToggleFavorite: () => void;
+  // Đánh giá hiển thị trong khối "Cả nhà nói gì?"; null khi chưa có hoặc mất mạng.
+  featuredReview: Review | null;
+  onOpenReviews: () => void;
 };
 
 function RecipeBody({
@@ -423,6 +508,8 @@ function RecipeBody({
   isSaved,
   unsaveBlocked,
   onToggleFavorite,
+  featuredReview,
+  onOpenReviews,
 }: RecipeBodyProps) {
   const authorName = recipe.author?.name?.trim();
   const rating = recipe.rating;
@@ -643,8 +730,7 @@ function RecipeBody({
         <View style={styles.sectionHeaderRow}>
           <Text style={styles.sectionTitle}>Cả nhà nói gì?</Text>
           {rating && rating.count > 0 ? (
-            /* TODO(B6 – Đánh giá): mở màn danh sách đánh giá, bỏ comingSoon(). */
-            <Pressable onPress={comingSoon} hitSlop={8} accessibilityRole="button">
+            <Pressable onPress={onOpenReviews} hitSlop={8} accessibilityRole="button">
               <Text style={styles.sectionLink}>{`Xem ${rating.count} đánh giá`}</Text>
             </Pressable>
           ) : null}
@@ -659,16 +745,29 @@ function RecipeBody({
             </View>
           </View>
         ) : (
-          // Chưa có API danh sách đánh giá nên không dựng đánh giá nổi bật như frame.
           <Text style={styles.reviewEmpty}>Chưa có đánh giá nào, hãy là người đầu tiên!</Text>
         )}
 
-        {/* TODO(B6 – Đánh giá): nối API gửi đánh giá, bỏ comingSoon(). */}
+        {/* Đánh giá nổi bật (frame 2003:10943): tên và sao ở dòng đầu, nhận xét ở dòng sau. */}
+        {featuredReview ? (
+          <View style={styles.featuredCard}>
+            <Text
+              style={styles.featuredHeading}
+              accessibilityLabel={`${featuredReview.author.name}, ${featuredReview.rating} trên 5 sao`}
+            >
+              {`${featuredReview.author.name} · ${formatStars(featuredReview.rating)}`}
+            </Text>
+            {featuredReview.comment?.trim() ? (
+              <Text style={styles.featuredComment}>{featuredReview.comment.trim()}</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={styles.networkAction}>
           <ActionButton
             title="Viết đánh giá"
             variant="secondary"
-            onPress={comingSoon}
+            onPress={onOpenReviews}
             disabled={isCached}
           />
           {isCached ? <Text style={styles.needNetwork}>Cần kết nối mạng</Text> : null}
@@ -899,6 +998,24 @@ const styles = StyleSheet.create({
     fontFamily: fonts.regular,
     fontSize: 13,
     lineHeight: 20,
+    color: colors.textMid,
+  },
+  featuredCard: {
+    gap: 8,
+    padding: spacing.lg,
+    borderRadius: 16,
+    backgroundColor: colors.surface,
+  },
+  featuredHeading: {
+    fontFamily: fonts.semiBold,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
+    color: colors.textDark,
+  },
+  featuredComment: {
+    fontFamily: fonts.regular,
+    fontSize: fontSize.xs,
+    lineHeight: 18,
     color: colors.textMid,
   },
 });

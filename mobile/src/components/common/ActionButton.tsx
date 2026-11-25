@@ -1,13 +1,14 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import type { IconAsset } from '@/constants/assets';
-import { spacing } from '@/constants/layout';
+import { extraColors, spacing } from '@/constants/layout';
 import { colors, fonts, radius } from '@/constants/theme';
 import { Icon } from './Icon';
 
 type Props = {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'secondary';
+  // 'danger': kiểu "Xóa" của thành phần Nút (nút "Xóa đánh giá", frame 2020:1028).
+  variant?: 'primary' | 'secondary' | 'danger';
   icon?: IconAsset;
   // Nút cần mạng khi đang xem bản lưu ngoại tuyến: mờ 40% như frame 2041:25924.
   disabled?: boolean;
@@ -27,12 +28,17 @@ export function ActionButton({ title, onPress, variant = 'primary', icon, disabl
       accessibilityState={{ disabled }}
       style={({ pressed }) => [
         styles.button,
-        isPrimary ? styles.primary : styles.secondary,
+        isPrimary ? styles.primary : variant === 'danger' ? styles.danger : styles.secondary,
         disabled ? styles.disabled : pressed ? styles.pressed : null,
       ]}
     >
       {icon ? <Icon icon={icon} /> : null}
-      <Text style={[styles.text, isPrimary ? styles.textPrimary : styles.textSecondary]}>
+      <Text
+        style={[
+          styles.text,
+          isPrimary ? styles.textPrimary : variant === 'danger' ? styles.textDanger : styles.textSecondary,
+        ]}
+      >
         {title}
       </Text>
     </Pressable>
@@ -51,9 +57,11 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: colors.primary },
   secondary: { backgroundColor: colors.softGreen },
+  danger: { backgroundColor: extraColors.dangerBg },
   pressed: { opacity: 0.85 },
   disabled: { opacity: 0.4 },
   text: { fontFamily: fonts.semiBold, fontSize: 14 },
   textPrimary: { color: colors.white },
   textSecondary: { color: colors.primary },
+  textDanger: { color: colors.error },
 });
