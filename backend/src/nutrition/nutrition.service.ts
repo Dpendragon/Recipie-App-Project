@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { SpoonacularProvider } from '../recipes/spoonacular.provider';
 import { Prisma } from '../generated/prisma/client';
 import { NutritionCoverage } from '../generated/prisma/enums';
 
@@ -35,12 +36,20 @@ export type IngredientFacts = {
   nutrition: NutritionBasis | null;
 };
 
+// Tổng dinh dưỡng của MỘT dòng nguyên liệu, đã ứng với đúng quantity/unit của
+// dòng đó nên không cần quy đổi nữa.
+export type LineNutrition = Record<MainKey, number> &
+  Record<ExtraKey, number | null>;
+
 // Một dòng recipe_ingredients ở dạng đã sẵn sàng để tính.
 export type NutritionLine = {
   quantity: number | null;
   unit: string | null;
   // null khi dòng chưa đối chiếu được với danh mục ingredients.
   facts: IngredientFacts | null;
+  // Số liệu dự phòng từ Spoonacular cho dòng chưa đối chiếu được (Mục 7.6);
+  // chỉ dùng để tính, không ghi vào danh mục nội bộ.
+  fallback?: LineNutrition | null;
 };
 
 export type NutritionResult = {
@@ -110,6 +119,22 @@ export function toBasisAmount(line: NutritionLine): number | null {
 }
 
 /**
+ * Nhân một bộ chỉ số theo hệ số quy đổi của dòng. Chỉ số phụ để trống thì giữ
+ * trống, không coi là 0.
+ */
+function scaleBasis(basis: NutritionBasis, factor: number): LineNutrition {
+  const result = {} as LineNutrition;
+  for (const key of MAIN_KEYS) {
+    result[key] = basis[key] * factor;
+  }
+  for (const key of EXTRA_KEYS) {
+    const value = basis[key];
+    result[key] = value === null ? null : value * factor;
+  }
+  return result;
+}
+
+/**
  * Cộng tổng các chỉ số, chia theo servings và xác định coverage
  * (Mục 7.6 bước 5 - 7). Dòng không quy đổi được bị bỏ qua, không làm sai tổng.
  */
@@ -133,19 +158,25 @@ export function computeRecipeNutrition(
   for (const line of lines) {
     const amount = toBasisAmount(line);
     const basis = line.facts?.nutrition;
-    if (amount === null || !basis) continue;
+
+    // Danh mục nội bộ là nguồn chính; số liệu dự phòng chỉ dùng cho dòng không
+    // đối chiếu/quy đổi được (Mục 7.6).
+    const contribution =
+      amount !== null && basis
+        ? scaleBasis(basis, amount / basis.basisQuantity)
+        : (line.fallback ?? null);
+    if (!contribution) continue;
 
     converted += 1;
-    const factor = amount / basis.basisQuantity;
 
     for (const key of MAIN_KEYS) {
-      totals[key] += basis[key] * factor;
+      totals[key] += contribution[key];
     }
     // Chỉ số phụ có thể trống ở một số nguyên liệu: chỉ cộng phần có số liệu.
     for (const key of EXTRA_KEYS) {
-      const value = basis[key];
+      const value = contribution[key];
       if (value !== null) {
-        extras[key] = (extras[key] ?? 0) + value * factor;
+        extras[key] = (extras[key] ?? 0) + value;
       }
     }
   }
@@ -187,13 +218,28 @@ type RecipeIngredientRow = {
   unit: string | null;
 };
 
+// Một dòng văn bản cho parseIngredients, ví dụ "500 g chicken breast" hoặc
+// "2 chicken egg" khi dòng không ghi đơn vị.
+function toIngredientText(
+  quantity: number,
+  unit: string | null,
+  nameEn: string,
+): string {
+  const parts = [String(quantity), unit?.trim() ?? '', nameEn.trim()];
+  return parts.filter((part) => part !== '').join(' ');
+}
+
 @Injectable()
 export class NutritionService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly spoonacular: SpoonacularProvider,
+  ) {}
 
   /**
    * Tính lại dinh dưỡng cho một công thức LOCAL và lưu vào recipes
-   * (Mục 7.6, dùng cho UC-17 và UC-19). Chưa có dự phòng Spoonacular.
+   * (Mục 7.6, dùng cho UC-17 và UC-19). Dòng không đối chiếu được với danh mục
+   * nội bộ sẽ thử nguồn dự phòng Spoonacular.
    */
   async calculate(recipeId: number): Promise<NutritionResult> {
     const recipe = await this.prisma.recipe.findUnique({
@@ -218,7 +264,10 @@ export class NutritionService {
     }
 
     const rows = await this.matchIngredients(recipe.ingredients);
-    const factsById = await this.loadFacts(rows);
+    const [factsById, fallbackByRow] = await Promise.all([
+      this.loadFacts(rows),
+      this.loadFallback(rows),
+    ]);
 
     const lines: NutritionLine[] = rows.map((row) => ({
       quantity: toNullableNumber(row.quantity),
@@ -227,6 +276,7 @@ export class NutritionService {
         row.ingredientId === null
           ? null
           : (factsById.get(row.ingredientId) ?? null),
+      fallback: fallbackByRow.get(row.id) ?? null,
     }));
 
     const result = computeRecipeNutrition(lines, recipe.servings);
@@ -292,6 +342,44 @@ export class NutritionService {
     );
 
     return result;
+  }
+
+  /**
+   * Nguồn dự phòng cho các dòng chưa đối chiếu được với danh mục nội bộ mà có
+   * name_en (Mục 7.6): gộp toàn bộ các dòng đó của công thức vào MỘT lần gọi
+   * parseIngredients. Kết quả chỉ dùng để tính, KHÔNG ghi ngược vào ingredients
+   * hay ingredient_nutrition. Trả về map theo recipe_ingredients.id.
+   */
+  private async loadFallback(
+    rows: RecipeIngredientRow[],
+  ): Promise<Map<number, LineNutrition>> {
+    const pending = rows.filter((row) => {
+      const quantity = toNullableNumber(row.quantity);
+      // Dòng không ghi số lượng (ví dụ "muối vừa đủ") thì nguồn dự phòng cũng
+      // không ước tính được đúng lượng, bỏ qua như nhánh nội bộ.
+      return (
+        row.ingredientId === null &&
+        !!row.nameEn?.trim() &&
+        quantity !== null &&
+        quantity > 0
+      );
+    });
+    if (pending.length === 0) return new Map();
+
+    // Đơn vị được gửi đúng như người dùng ghi; Spoonacular tự bỏ qua đơn vị nó
+    // không hiểu.
+    const parsed = await this.spoonacular.parseIngredients(
+      pending.map((row) =>
+        toIngredientText(toNumber(row.quantity), row.unit, row.nameEn ?? ''),
+      ),
+    );
+
+    return new Map(
+      pending.flatMap((row, index): [number, LineNutrition][] => {
+        const nutrition = parsed[index];
+        return nutrition ? [[row.id, nutrition]] : [];
+      }),
+    );
   }
 
   // Tải danh mục và ingredient_nutrition cho các dòng đã có ingredient_id

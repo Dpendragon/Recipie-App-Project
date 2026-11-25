@@ -1,5 +1,6 @@
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
+import { SpoonacularProvider } from '../recipes/spoonacular.provider';
 import { Prisma } from '../generated/prisma/client';
 import { NutritionCoverage } from '../generated/prisma/enums';
 import {
@@ -7,6 +8,7 @@ import {
   NutritionService,
   toBasisAmount,
   type IngredientFacts,
+  type LineNutrition,
   type NutritionLine,
 } from './nutrition.service';
 
@@ -127,12 +129,24 @@ const TAPIOCA_STARCH: IngredientFacts = {
   nutrition: null,
 };
 
+// Số liệu Spoonacular trả cho một dòng: tổng ứng với đúng lượng của dòng đó.
+const PARSED_DRAGON_FRUIT: LineNutrition = {
+  calories: 60,
+  protein: 1.2,
+  fat: 0.4,
+  carbohydrates: 13,
+  fiber: 3,
+  sugar: 8,
+  sodium: 0,
+};
+
 function line(
   quantity: number | null,
   unit: string | null,
   facts: IngredientFacts | null,
+  fallback: LineNutrition | null = null,
 ): NutritionLine {
-  return { quantity, unit, facts };
+  return { quantity, unit, facts, fallback };
 }
 
 describe('toBasisAmount', () => {
@@ -306,6 +320,40 @@ describe('computeRecipeNutrition', () => {
     });
   });
 
+  it('cộng số liệu dự phòng cho dòng chưa đối chiếu và vẫn đạt FULL', () => {
+    const result = computeRecipeNutrition(
+      [
+        line(2, 'quả', TOMATO),
+        // Không có trong danh mục nội bộ, lấy được từ nguồn dự phòng.
+        line(100, 'g', null, PARSED_DRAGON_FRUIT),
+      ],
+      1,
+    );
+
+    expect(result.coverage).toBe(NutritionCoverage.FULL);
+    expect(result.nutrition).toEqual({
+      // 18*2.4 + 60
+      calories: 103.2,
+      protein: 3.36,
+      fat: 0.88,
+      carbohydrates: 22.36,
+      fiber: 5.88,
+      sugar: 14.24,
+      sodium: 12,
+    });
+  });
+
+  it('ưu tiên danh mục nội bộ, bỏ qua số liệu dự phòng khi đã quy đổi được', () => {
+    const withFallback = computeRecipeNutrition(
+      [line(2, 'quả', TOMATO, PARSED_DRAGON_FRUIT)],
+      1,
+    );
+
+    expect(withFallback).toEqual(
+      computeRecipeNutrition([line(2, 'quả', TOMATO)], 1),
+    );
+  });
+
   it('NONE và nutrition null khi không dòng nào quy đổi được', () => {
     const result = computeRecipeNutrition(
       [line(50, 'g', TAPIOCA_STARCH), line(2, 'muỗng', TOMATO)],
@@ -350,9 +398,11 @@ describe('computeRecipeNutrition', () => {
 describe('NutritionService.calculate', () => {
   const prismaMock = {
     recipe: { findUnique: jest.fn(), update: jest.fn() },
-    ingredient: { findMany: jest.fn() },
+    ingredient: { findMany: jest.fn(), create: jest.fn(), upsert: jest.fn() },
+    ingredientNutrition: { create: jest.fn(), upsert: jest.fn() },
     recipeIngredient: { updateMany: jest.fn() },
   };
+  const spoonacularMock = { parseIngredients: jest.fn() };
 
   let service: NutritionService;
 
@@ -372,11 +422,14 @@ describe('NutritionService.calculate', () => {
     jest.clearAllMocks();
     prismaMock.recipe.update.mockResolvedValue({});
     prismaMock.recipeIngredient.updateMany.mockResolvedValue({ count: 1 });
+    // Mặc định nguồn dự phòng không trả gì (thiếu key hoặc lỗi mạng).
+    spoonacularMock.parseIngredients.mockResolvedValue([]);
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         NutritionService,
         { provide: PrismaService, useValue: prismaMock },
+        { provide: SpoonacularProvider, useValue: spoonacularMock },
       ],
     }).compile();
     service = moduleRef.get(NutritionService);
@@ -438,6 +491,121 @@ describe('NutritionService.calculate', () => {
         nutritionUpdatedAt: expect.any(Date),
       },
     });
+  });
+
+  it('gọi parseIngredients MỘT lần cho các dòng chưa khớp và dùng kết quả để tính', async () => {
+    prismaMock.recipe.findUnique.mockResolvedValue({
+      servings: 1,
+      ingredients: [
+        {
+          id: 31,
+          ingredientId: 30,
+          nameEn: 'Tomato',
+          quantity: 100,
+          unit: 'g',
+        },
+        {
+          id: 32,
+          ingredientId: null,
+          nameEn: 'Dragon fruit',
+          quantity: 150,
+          unit: 'g',
+        },
+        {
+          id: 33,
+          ingredientId: null,
+          nameEn: 'Starfruit',
+          quantity: 2,
+          unit: null,
+        },
+      ],
+    });
+    mockIngredientQueries([], [{ id: 30, ...TOMATO }]);
+    // Dòng thứ hai Spoonacular cũng không ước tính được.
+    spoonacularMock.parseIngredients.mockResolvedValue([
+      PARSED_DRAGON_FRUIT,
+      null,
+    ]);
+
+    const result = await service.calculate(12);
+
+    // Một lần gọi cho cả công thức, không gọi riêng từng dòng.
+    expect(spoonacularMock.parseIngredients).toHaveBeenCalledTimes(1);
+    expect(spoonacularMock.parseIngredients).toHaveBeenCalledWith([
+      '150 g Dragon fruit',
+      '2 Starfruit',
+    ]);
+
+    expect(result.coverage).toBe(NutritionCoverage.PARTIAL);
+    expect(result.nutrition).toEqual({
+      calories: 78,
+      protein: 2.1,
+      fat: 0.6,
+      carbohydrates: 16.9,
+      fiber: 4.2,
+      sugar: 10.6,
+      sodium: 5,
+    });
+
+    // Kết quả dự phòng KHÔNG được ghi ngược vào danh mục nội bộ (Mục 7.6).
+    expect(prismaMock.ingredient.create).not.toHaveBeenCalled();
+    expect(prismaMock.ingredient.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.ingredientNutrition.create).not.toHaveBeenCalled();
+    expect(prismaMock.ingredientNutrition.upsert).not.toHaveBeenCalled();
+    expect(prismaMock.recipeIngredient.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('không gọi nguồn dự phòng cho dòng thiếu name_en hoặc thiếu số lượng', async () => {
+    prismaMock.recipe.findUnique.mockResolvedValue({
+      servings: 1,
+      ingredients: [
+        { id: 41, ingredientId: null, nameEn: null, quantity: 100, unit: 'g' },
+        {
+          id: 42,
+          ingredientId: null,
+          nameEn: 'Salt',
+          quantity: null,
+          unit: null,
+        },
+      ],
+    });
+    mockIngredientQueries([], []);
+
+    const result = await service.calculate(13);
+
+    expect(spoonacularMock.parseIngredients).not.toHaveBeenCalled();
+    expect(result.coverage).toBe(NutritionCoverage.NONE);
+  });
+
+  it('vẫn lưu nutrition khi nguồn dự phòng không dùng được', async () => {
+    prismaMock.recipe.findUnique.mockResolvedValue({
+      servings: 1,
+      ingredients: [
+        {
+          id: 51,
+          ingredientId: 30,
+          nameEn: 'Tomato',
+          quantity: 100,
+          unit: 'g',
+        },
+        {
+          id: 52,
+          ingredientId: null,
+          nameEn: 'Dragon fruit',
+          quantity: 150,
+          unit: 'g',
+        },
+      ],
+    });
+    mockIngredientQueries([], [{ id: 30, ...TOMATO }]);
+    // Thiếu SPOONACULAR_API_KEY hoặc lỗi mạng: provider trả mảng rỗng.
+    spoonacularMock.parseIngredients.mockResolvedValue([]);
+
+    const result = await service.calculate(14);
+
+    expect(result.coverage).toBe(NutritionCoverage.PARTIAL);
+    expect(result.nutrition?.calories).toBe(18);
+    expect(prismaMock.recipe.update).toHaveBeenCalledTimes(1);
   });
 
   it('không truy vấn đối chiếu khi mọi dòng đã có ingredient_id', async () => {
