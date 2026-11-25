@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import { ActionButton } from '@/components/common/ActionButton';
 import { Icon } from '@/components/common/Icon';
 import { Notice } from '@/components/common/Notice';
@@ -7,12 +9,14 @@ import { icons } from '@/constants/assets';
 import { extraColors } from '@/constants/layout';
 import { colors, fonts, radius } from '@/constants/theme';
 import { autocomplete } from '@/services/api/ingredientApi';
+import { uploadImage } from '@/services/api/mediaApi';
 import type { IngredientSuggestion } from '@/types/ingredient.types';
 import type { RecipeIngredientInput } from '@/types/recipe.types';
 
 // Form dùng chung cho "Đăng công thức mới" (UC-17) và "Chỉnh sửa công thức"
-// (UC-19), theo frame 2003:10409 và trạng thái đang gửi 2041:26469.
-// Khối "Ảnh món ăn" của frame tạm ẩn: phần ảnh làm ở bước sau.
+// (UC-19), theo frame 2003:10409 và trạng thái đang gửi 2041:26469. Khối "Ảnh
+// món ăn" theo 2003:10409, bảng chọn nguồn ảnh theo 2041:26802 và thông báo
+// tải ảnh thất bại theo 2041:26290.
 
 // Một dòng nguyên liệu khi đang soạn: giữ nguyên chuỗi người dùng gõ, chỉ đổi
 // sang số lúc gửi. key để React giữ đúng ô khi thêm/xoá giữa danh sách.
@@ -33,6 +37,8 @@ export type RecipeFormValue = {
   ingredients: IngredientDraft[];
   steps: StepDraft[];
   videoUrl: string;
+  // Ảnh đã lưu trên server (chế độ sửa); null khi công thức chưa có ảnh.
+  imageUrl: string | null;
 };
 
 // Dữ liệu đã kiểm tra và chuẩn hoá, màn hình gọi API dựng body từ đây. Hai
@@ -44,6 +50,12 @@ export type RecipeFormSubmit = {
   steps: string[];
   videoUrl: string | null;
   ingredients: RecipeIngredientInput[];
+  // undefined: giữ nguyên ảnh cũ (không chọn ảnh mới, hoặc upload thất bại).
+  // string: ảnh vừa tải lên. null: người dùng đã bấm "Gỡ ảnh".
+  imageUrl: string | null | undefined;
+  // true khi có ảnh mới nhưng tải lên hỏng: màn hình lưu công thức xong thì
+  // phải ở lại và báo thiếu ảnh (UC-17 ngoại lệ 5a).
+  imageUploadFailed: boolean;
 };
 
 type FormErrors = {
@@ -64,6 +76,10 @@ type Props = {
   submitting: boolean;
   // Lỗi server trả về khi gửi.
   submitError: string | null;
+  // Công thức đã lưu xong nhưng ảnh tải lên thất bại (UC-17 ngoại lệ 5a): màn
+  // hình truyền hàm mở công thức vừa lưu, form hiện thông báo kèm nút "Xem
+  // công thức" theo frame 2041:26290. Bỏ trống khi chưa gặp ngoại lệ này.
+  onViewSaved?: () => void;
   onSubmit: (value: RecipeFormSubmit) => void;
 };
 
@@ -78,6 +94,18 @@ const URL_MAX = 500;
 const SUGGEST_DEBOUNCE_MS = 300;
 const SUGGEST_MIN_LENGTH = 2;
 const SUGGEST_LIMIT = 5;
+
+// Ảnh gửi lên backend tối đa 5 MB và chỉ nhận JPEG/PNG/WebP: nén bớt ngay lúc
+// chọn để ảnh gốc từ máy ảnh điện thoại không bị từ chối.
+const IMAGE_QUALITY = 0.8;
+
+// UC-17 ngoại lệ 5a: upload hỏng thì công thức vẫn được lưu, chỉ tạm thời chưa
+// có ảnh; người dùng bổ sung sau qua UC-19 (frame 2041:26290).
+const IMAGE_FAILED_MESSAGE = 'Công thức vẫn được lưu, bạn có thể thêm ảnh sau';
+const IMAGE_PICK_FAILED_MESSAGE = 'Không mở được thư viện ảnh. Vui lòng thử lại.';
+const CAMERA_DENIED_MESSAGE =
+  'Bạn chưa cho phép dùng máy ảnh. Hãy bật quyền máy ảnh trong Cài đặt, hoặc chọn ảnh từ thư viện.';
+const CAMERA_FAILED_MESSAGE = 'Không mở được máy ảnh. Vui lòng thử lại.';
 
 let keySeed = 0;
 
@@ -102,6 +130,7 @@ export function createEmptyRecipeForm(): RecipeFormValue {
     ingredients: [emptyIngredient()],
     steps: [emptyStep()],
     videoUrl: '',
+    imageUrl: null,
   };
 }
 
@@ -123,12 +152,35 @@ function isBlankIngredient(row: IngredientDraft): boolean {
   return !row.nameVi.trim() && !row.nameEn.trim() && !row.quantity.trim() && !row.unit.trim();
 }
 
-export function RecipeForm({ mode, initialValue, submitting, submitError, onSubmit }: Props) {
+export function RecipeForm({
+  mode,
+  initialValue,
+  submitting,
+  submitError,
+  onViewSaved,
+  onSubmit,
+}: Props) {
   const [value, setValue] = useState<RecipeFormValue>(() => initialValue ?? createEmptyRecipeForm());
   const [errors, setErrors] = useState<FormErrors>({});
 
+  // Ảnh vừa chọn từ thư viện, chưa tải lên: chỉ upload khi bấm Đăng/Lưu.
+  const [localUri, setLocalUri] = useState<string | null>(null);
+  // Ảnh công thức đang có trên server lúc mở form, để biết "Gỡ ảnh" có cần gửi
+  // null hay không (POST không nhận null, chỉ PATCH mới xoá được ảnh cũ).
+  const [savedImageUrl] = useState<string | null>(() => initialValue?.imageUrl ?? null);
+  const [uploading, setUploading] = useState(false);
+  const [imageNotice, setImageNotice] = useState<string | null>(null);
+  // Bảng "Chọn ảnh" trượt từ dưới lên (frame 2041:26802).
+  const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
+
   const isEdit = mode === 'edit';
-  const faded = submitting ? styles.faded : null;
+  // Trong lúc tải ảnh lên, form cũng phải khoá như khi đang gửi công thức.
+  const busy = submitting || uploading;
+  const faded = busy ? styles.faded : null;
+  const previewUri = localUri ?? value.imageUrl;
+  // Công thức mới đã lưu xong rồi thì không cho đăng lần hai: ẩn nút gửi. Chế
+  // độ sửa vẫn giữ nút để người dùng lưu lại, tức thử tải ảnh thêm lần nữa.
+  const canSubmit = isEdit || !onViewSaved;
 
   const patch = (next: Partial<RecipeFormValue>) => setValue((current) => ({ ...current, ...next }));
 
@@ -157,10 +209,89 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
     setValue((current) => ({ ...current, steps: current.steps.filter((step) => step.key !== key) }));
   };
 
+  // Kết quả chung của hai nguồn ảnh: người dùng bấm huỷ thì giữ nguyên ảnh cũ.
+  const applyPicked = (result: ImagePicker.ImagePickerResult) => {
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (!asset) return;
+    setImageNotice(null);
+    setLocalUri(asset.uri);
+  };
+
+  // "Chọn từ thư viện" (frame 2041:26802): launchImageLibraryAsync không cần
+  // xin quyền trước với ảnh.
+  const pickFromLibrary = async () => {
+    setSourceSheetOpen(false);
+    if (busy) return;
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        quality: IMAGE_QUALITY,
+      });
+      applyPicked(result);
+    } catch {
+      setImageNotice(IMAGE_PICK_FAILED_MESSAGE);
+    }
+  };
+
+  // "Chụp ảnh" (frame 2041:26802): máy ảnh bắt buộc phải xin quyền trước. Từ
+  // chối thì chỉ báo lại và ở nguyên form, người dùng vẫn chọn được từ thư viện.
+  const takePhoto = async () => {
+    setSourceSheetOpen(false);
+    if (busy) return;
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        setImageNotice(CAMERA_DENIED_MESSAGE);
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: IMAGE_QUALITY,
+      });
+      applyPicked(result);
+    } catch {
+      setImageNotice(CAMERA_FAILED_MESSAGE);
+    }
+  };
+
+  // "Gỡ ảnh": bỏ cả ảnh vừa chọn lẫn ảnh cũ trên server.
+  const removeImage = () => {
+    if (busy) return;
+    setImageNotice(null);
+    setLocalUri(null);
+    patch({ imageUrl: null });
+  };
+
+  // Ảnh chỉ tải lên ngay trước khi tạo/cập nhật công thức. imageUrl là giá trị
+  // gửi kèm body (undefined là "không đụng tới ảnh hiện có"); uploadFailed để
+  // màn hình biết công thức lưu xong nhưng còn thiếu ảnh.
+  const resolveImageUrl = async (): Promise<{
+    imageUrl: string | null | undefined;
+    uploadFailed: boolean;
+  }> => {
+    if (localUri) {
+      setUploading(true);
+      try {
+        return { imageUrl: await uploadImage(localUri), uploadFailed: false };
+      } catch {
+        // UC-17 ngoại lệ 5a: vẫn lưu công thức, chỉ là chưa có ảnh mới.
+        return { imageUrl: undefined, uploadFailed: true };
+      } finally {
+        setUploading(false);
+      }
+    }
+    // Người dùng đã gỡ ảnh cũ: chỉ PATCH mới xoá được (savedImageUrl khác null).
+    if (value.imageUrl === null && savedImageUrl !== null) {
+      return { imageUrl: null, uploadFailed: false };
+    }
+    return { imageUrl: undefined, uploadFailed: false };
+  };
+
   // Ngoại lệ 2a của UC-17: thiếu tên món, số người ăn hoặc nguyên liệu thì báo
   // lỗi ngay tại form, không gọi API. Các kiểm tra còn lại bám theo CreateRecipeDto.
-  const submit = () => {
-    if (submitting) return;
+  const submit = async () => {
+    if (busy) return;
 
     const found: FormErrors = {};
     const rows: Record<string, string> = {};
@@ -222,6 +353,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
     }
 
     setErrors({});
+    const image = await resolveImageUrl();
     onSubmit({
       title,
       servings,
@@ -229,11 +361,23 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
       steps,
       videoUrl: videoUrl || null,
       ingredients,
+      imageUrl: image.imageUrl,
+      imageUploadFailed: image.uploadFailed,
     });
   };
 
   return (
     <View style={styles.form}>
+      {/* Đã lưu nhưng ảnh hỏng (frame 2041:26290): ở lại màn, tự bấm để xem. */}
+      {onViewSaved ? (
+        <View style={styles.savedNotice}>
+          <Text style={styles.savedNoticeText}>{IMAGE_FAILED_MESSAGE}</Text>
+          <ActionButton title="Xem công thức" variant="secondary" onPress={onViewSaved} />
+        </View>
+      ) : null}
+
+      {imageNotice ? <Notice variant="warning" message={imageNotice} /> : null}
+
       {isEdit ? (
         <Notice
           variant="success"
@@ -241,6 +385,64 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
           message="Đang sửa món đã đăng. Các thay đổi chỉ hiển thị sau khi bạn lưu."
         />
       ) : null}
+
+      <View style={styles.imageBlock}>
+        <View style={styles.sectionHeading}>
+          <Text style={styles.sectionTitle}>Ảnh món ăn</Text>
+          <Text style={styles.sectionMeta}>Không bắt buộc</Text>
+        </View>
+
+        {/* Chạm vùng ảnh để mở bảng chọn nguồn ảnh (frame 2041:26802). */}
+        <Pressable
+          onPress={() => setSourceSheetOpen(true)}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel={previewUri ? 'Đổi ảnh món ăn' : 'Chọn ảnh món ăn'}
+          style={({ pressed }) => [
+            styles.preview,
+            previewUri ? null : styles.previewEmpty,
+            faded,
+            pressed ? styles.pressed : null,
+          ]}
+        >
+          {previewUri ? (
+            <Image
+              source={{ uri: previewUri }}
+              style={styles.previewImage}
+              contentFit="cover"
+              accessibilityLabel="Ảnh món ăn đã chọn"
+            />
+          ) : (
+            <>
+              <Text style={styles.previewEmptyText}>Chọn ảnh món ăn</Text>
+              <Text style={styles.previewEmptyHint}>JPEG, PNG hoặc WebP, tối đa 5 MB</Text>
+            </>
+          )}
+        </Pressable>
+
+        <View style={styles.imageActions}>
+          <Pressable
+            onPress={() => void pickFromLibrary()}
+            disabled={busy}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={previewUri ? 'Chọn ảnh khác từ thư viện' : 'Chọn ảnh từ thư viện'}
+          >
+            <Text style={[styles.imageLink, faded]}>Chọn ảnh từ thư viện</Text>
+          </Pressable>
+          {previewUri ? (
+            <Pressable
+              onPress={removeImage}
+              disabled={busy}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="Gỡ ảnh món ăn"
+            >
+              <Text style={[styles.imageRemove, faded]}>Gỡ ảnh</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
       <View style={styles.general}>
         <View style={[styles.field, faded]}>
@@ -251,7 +453,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
               onChangeText={(text) => patch({ title: text })}
               placeholder="Ví dụ: Đậu hũ sốt cà chua"
               placeholderTextColor={colors.textMid}
-              editable={!submitting}
+              editable={!busy}
               maxLength={TITLE_MAX}
               accessibilityLabel="Tên công thức, bắt buộc"
               style={styles.input}
@@ -270,7 +472,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
                 placeholder="2"
                 placeholderTextColor={colors.textMid}
                 keyboardType="number-pad"
-                editable={!submitting}
+                editable={!busy}
                 maxLength={3}
                 accessibilityLabel="Số người ăn, bắt buộc"
                 style={styles.input}
@@ -289,7 +491,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
                 placeholder="20"
                 placeholderTextColor={colors.textMid}
                 keyboardType="number-pad"
-                editable={!submitting}
+                editable={!busy}
                 maxLength={4}
                 accessibilityLabel="Thời gian nấu tính bằng phút, không bắt buộc"
                 style={styles.input}
@@ -317,7 +519,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
             row={row}
             index={index}
             error={errors.rows?.[row.key] ?? null}
-            submitting={submitting}
+            submitting={busy}
             canRemove={value.ingredients.length > 1}
             onChange={(next) => patchIngredient(row.key, next)}
             onRemove={() => removeIngredient(row.key)}
@@ -329,7 +531,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
           title="Thêm nguyên liệu"
           variant="secondary"
           icon={icons.formPlus}
-          disabled={submitting}
+          disabled={busy}
           onPress={() =>
             setValue((current) => ({
               ...current,
@@ -349,7 +551,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
               {value.steps.length > 1 ? (
                 <Pressable
                   onPress={() => removeStep(step.key)}
-                  disabled={submitting}
+                  disabled={busy}
                   hitSlop={10}
                   accessibilityRole="button"
                   accessibilityLabel={`Xoá bước ${index + 1}`}
@@ -365,7 +567,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
               placeholderTextColor={colors.textMid}
               multiline
               textAlignVertical="top"
-              editable={!submitting}
+              editable={!busy}
               accessibilityLabel={`Nội dung bước ${index + 1}`}
               style={styles.stepInput}
             />
@@ -377,7 +579,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
           title="Thêm bước thực hiện"
           variant="secondary"
           icon={icons.formPlus}
-          disabled={submitting}
+          disabled={busy}
           onPress={() => setValue((current) => ({ ...current, steps: [...current.steps, emptyStep()] }))}
         />
       </View>
@@ -392,7 +594,7 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
             placeholderTextColor={colors.textMid}
             autoCapitalize="none"
             keyboardType="url"
-            editable={!submitting}
+            editable={!busy}
             maxLength={URL_MAX}
             accessibilityLabel="Liên kết video hướng dẫn, không bắt buộc"
             style={styles.input}
@@ -415,18 +617,63 @@ export function RecipeForm({ mode, initialValue, submitting, submitError, onSubm
 
       <Notice variant="error" message={submitError} />
 
-      {submitting ? (
+      {busy ? (
         <View style={styles.busyButton} accessibilityLabel={isEdit ? 'Đang lưu' : 'Đang đăng'}>
           <ActivityIndicator color={colors.white} />
-          <Text style={styles.busyText}>{isEdit ? 'Đang lưu…' : 'Đang đăng…'}</Text>
+          <Text style={styles.busyText}>
+            {uploading ? 'Đang tải ảnh lên…' : isEdit ? 'Đang lưu…' : 'Đang đăng…'}
+          </Text>
         </View>
-      ) : (
+      ) : canSubmit ? (
         <ActionButton
           title={isEdit ? 'Lưu thay đổi' : 'Đăng công thức'}
           icon={icons.toastCheck}
-          onPress={submit}
+          onPress={() => void submit()}
         />
-      )}
+      ) : null}
+
+      {/* Bảng chọn nguồn ảnh (frame 2041:26802). */}
+      <Modal
+        visible={sourceSheetOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSourceSheetOpen(false)}
+      >
+        <View style={styles.sheetBackdrop}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setSourceSheetOpen(false)}
+            accessibilityLabel="Đóng bảng chọn ảnh"
+          />
+          <View style={styles.sheet} accessibilityViewIsModal>
+            <View style={styles.sheetHandle}>
+              <View style={styles.sheetHandleBar} />
+            </View>
+            <Text style={styles.sheetTitle}>Chọn ảnh</Text>
+            <View>
+              <Pressable
+                onPress={() => void takePhoto()}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.sheetOption, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.sheetOptionText}>Chụp ảnh</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => void pickFromLibrary()}
+                accessibilityRole="button"
+                style={({ pressed }) => [styles.sheetOption, pressed ? styles.pressed : null]}
+              >
+                <Text style={styles.sheetOptionText}>Chọn từ thư viện</Text>
+              </Pressable>
+            </View>
+            <ActionButton
+              title="Hủy"
+              variant="secondary"
+              onPress={() => setSourceSheetOpen(false)}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -625,6 +872,67 @@ const styles = StyleSheet.create({
   sectionTitle: { fontFamily: fonts.semiBold, fontSize: 18, color: colors.textDark },
   sectionMeta: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
   hint: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16.5, color: colors.textMid },
+
+  // Khối "Ảnh món ăn" (frame 2003:10409): ảnh xem trước 215 px, bên dưới là
+  // hàng hành động chọn ảnh / gỡ ảnh (frame 2041:26802).
+  imageBlock: { gap: 12 },
+  preview: {
+    width: '100%',
+    height: 215,
+    borderRadius: 14,
+    overflow: 'hidden',
+    backgroundColor: extraColors.fieldSoft,
+  },
+  previewImage: { width: '100%', height: '100%' },
+  previewEmpty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: colors.border,
+  },
+  previewEmptyText: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.textMid },
+  previewEmptyHint: { fontFamily: fonts.regular, fontSize: 11, color: colors.textMuted },
+  imageActions: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  imageLink: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
+  imageRemove: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.textMuted },
+
+  // Thông báo "đã lưu nhưng chưa có ảnh" kèm nút mở công thức (2041:26307).
+  savedNotice: {
+    gap: 10,
+    padding: 14,
+    borderRadius: radius.input,
+    backgroundColor: extraColors.warningBg,
+  },
+  savedNoticeText: {
+    fontFamily: fonts.regular,
+    fontSize: 12,
+    lineHeight: 18,
+    color: extraColors.warningText,
+  },
+
+  // Bảng chọn nguồn ảnh (frame 2041:26803): trượt từ đáy, bo góc trên 24.
+  sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: extraColors.overlay },
+  sheet: {
+    gap: 20,
+    paddingTop: 10,
+    paddingBottom: 24,
+    paddingHorizontal: 22,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    backgroundColor: colors.background,
+  },
+  sheetHandle: { alignItems: 'center' },
+  sheetHandleBar: { width: 38, height: 4, borderRadius: 4, backgroundColor: colors.border },
+  sheetTitle: { fontFamily: fonts.bold, fontSize: 24, color: colors.textDark },
+  sheetOption: {
+    justifyContent: 'center',
+    height: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetOptionText: { fontFamily: fonts.semiBold, fontSize: 14, color: colors.textDark },
 
   ingredientCard: {
     gap: 9,

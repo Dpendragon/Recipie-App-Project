@@ -22,8 +22,7 @@ import type { RecipeDetail, UpdateRecipeRequest } from '@/types/recipe.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
 // UC-19 Sửa công thức đã đăng, theo frame 2003:10409 ở chế độ "chỉnh sửa"
-// (banner nhắc nằm trong RecipeForm) và 2075:1506 (toast). Khối ảnh món ăn của
-// frame vẫn tạm ẩn, làm cùng lúc với màn đăng mới.
+// (banner nhắc nằm trong RecipeForm) và 2075:1506 (toast).
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -68,6 +67,7 @@ function toFormValue(recipe: RecipeDetail): RecipeFormValue {
     ingredients: ingredients.length > 0 ? ingredients : [emptyIngredient()],
     steps: steps.length > 0 ? steps : [emptyStep()],
     videoUrl: recipe.videoUrl ?? '',
+    imageUrl: recipe.imageUrl,
   };
 }
 
@@ -87,6 +87,9 @@ export default function EditRecipeScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Đã lưu thay đổi nhưng ảnh tải lên hỏng (UC-17 ngoại lệ 5a, frame
+  // 2041:26290): ở lại màn này thay vì tự sang màn chi tiết.
+  const [imageFailed, setImageFailed] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -135,6 +138,11 @@ export default function EditRecipeScreen() {
     };
   }, [attempt, leave, recipeId]);
 
+  const openRecipe = useCallback(() => {
+    // replace để màn chi tiết dựng lại và tải dữ liệu vừa cập nhật.
+    router.replace({ pathname: '/recipe/[id]', params: { id: String(recipeId), source: 'LOCAL' } });
+  }, [recipeId, router]);
+
   // Luồng chính bước 4-7. Gửi cả danh sách nguyên liệu: server đồng bộ lại
   // recipe_ingredients trong một transaction và chỉ tính lại dinh dưỡng khi
   // nguyên liệu hoặc số khẩu phần thực sự đổi.
@@ -150,17 +158,25 @@ export default function EditRecipeScreen() {
       videoUrl: value.videoUrl,
       ingredients: value.ingredients,
     };
+    // Chỉ gửi imageUrl khi ảnh thực sự đổi: chuỗi là ảnh mới vừa upload, null
+    // là người dùng bấm "Gỡ ảnh", undefined là giữ nguyên ảnh cũ.
+    if (value.imageUrl !== undefined) body.imageUrl = value.imageUrl;
 
     setSubmitError(null);
+    setImageFailed(false);
     setSubmitting(true);
     try {
       await update(recipeId, body);
       showToast('Đã lưu thay đổi');
+      if (value.imageUploadFailed) {
+        // Ngoại lệ 5a: thay đổi đã lưu nhưng ảnh chưa lên được — giữ nguyên
+        // màn hình để người dùng lưu lại hoặc tự mở công thức.
+        setImageFailed(true);
+        setSubmitting(false);
+        return;
+      }
       // Vẫn để submitting = true tới lúc chuyển màn để không gửi lần hai.
-      timerRef.current = setTimeout(() => {
-        // replace để màn chi tiết dựng lại và tải dữ liệu vừa cập nhật.
-        router.replace({ pathname: '/recipe/[id]', params: { id: String(recipeId), source: 'LOCAL' } });
-      }, REDIRECT_DELAY_MS);
+      timerRef.current = setTimeout(openRecipe, REDIRECT_DELAY_MS);
     } catch (error) {
       const fatal = fatalMessage(error);
       if (fatal) {
@@ -216,6 +232,7 @@ export default function EditRecipeScreen() {
             initialValue={initialValue}
             submitting={submitting}
             submitError={submitError}
+            onViewSaved={imageFailed ? openRecipe : undefined}
             onSubmit={(value) => void submit(value)}
           />
         ) : null}

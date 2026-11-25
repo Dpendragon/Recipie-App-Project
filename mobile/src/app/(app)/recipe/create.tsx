@@ -13,7 +13,7 @@ import type { CreateRecipeRequest } from '@/types/recipe.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
 // UC-17 Đăng công thức cá nhân, theo frame 2003:10409 (form), 2041:26469
-// (đang đăng) và 2075:1506 (toast). Ảnh món ăn làm ở bước sau.
+// (đang đăng), 2075:1506 (toast) và 2041:26290 (tải ảnh thất bại).
 
 // Giữ toast "Đã đăng công thức" hiện một nhịp trước khi sang màn chi tiết.
 const REDIRECT_DELAY_MS = 900;
@@ -24,6 +24,9 @@ export default function CreateRecipeScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Id công thức vừa tạo khi ảnh tải lên hỏng: ở lại màn này, người dùng tự
+  // bấm "Xem công thức" (UC-17 ngoại lệ 5a).
+  const [savedId, setSavedId] = useState<string | null>(null);
 
   const redirectRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -33,8 +36,12 @@ export default function CreateRecipeScreen() {
     [],
   );
 
+  const openRecipe = (id: string) => {
+    router.replace({ pathname: '/recipe/[id]', params: { id, source: 'LOCAL' } });
+  };
+
   const submit = async (value: RecipeFormSubmit) => {
-    if (submitting) return;
+    if (submitting || savedId !== null) return;
 
     // POST /recipes không nhận null: trường để trống thì bỏ hẳn khỏi body.
     const body: CreateRecipeRequest = {
@@ -45,6 +52,9 @@ export default function CreateRecipeScreen() {
     };
     if (value.readyInMinutes !== null) body.readyInMinutes = value.readyInMinutes;
     if (value.videoUrl !== null) body.videoUrl = value.videoUrl;
+    // Ảnh được form upload trước khi gọi vào đây; upload lỗi thì imageUrl là
+    // undefined và công thức vẫn được lưu không có ảnh (UC-17 ngoại lệ 5a).
+    if (value.imageUrl) body.imageUrl = value.imageUrl;
 
     setSubmitError(null);
     setSubmitting(true);
@@ -53,13 +63,15 @@ export default function CreateRecipeScreen() {
       // Công thức đã lưu kể cả khi chưa ước tính được dinh dưỡng (ngoại lệ 8a):
       // màn chi tiết tự ẩn phần dinh dưỡng khi coverage là NONE.
       showToast('Đã đăng công thức');
+      if (value.imageUploadFailed) {
+        // Ngoại lệ 5a: đã lưu nhưng thiếu ảnh — giữ nguyên màn hình, form ẩn
+        // nút đăng và hiện thông báo kèm nút "Xem công thức".
+        setSavedId(String(created.id));
+        setSubmitting(false);
+        return;
+      }
       // Vẫn để submitting = true tới lúc chuyển màn để không gửi lần hai.
-      redirectRef.current = setTimeout(() => {
-        router.replace({
-          pathname: '/recipe/[id]',
-          params: { id: created.id, source: 'LOCAL' },
-        });
-      }, REDIRECT_DELAY_MS);
+      redirectRef.current = setTimeout(() => openRecipe(String(created.id)), REDIRECT_DELAY_MS);
     } catch (error) {
       setSubmitError(getApiErrorMessage(error));
       setSubmitting(false);
@@ -89,6 +101,7 @@ export default function CreateRecipeScreen() {
           mode="create"
           submitting={submitting}
           submitError={submitError}
+          onViewSaved={savedId === null ? undefined : () => openRecipe(savedId)}
           onSubmit={(value) => void submit(value)}
         />
       </KeyboardScreen>

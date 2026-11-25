@@ -9,6 +9,7 @@ import { IngredientsModule } from './ingredients/ingredients.module';
 import { NutritionModule } from './nutrition/nutrition.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
+import { MediaModule } from './media/media.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { FavoritesModule } from './favorites/favorites.module';
     NutritionModule,
     ReviewsModule,
     FavoritesModule,
+    MediaModule,
   ],
   controllers: [AppController],
   providers: [AppService],
