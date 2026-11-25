@@ -1,7 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Pressable,
   RefreshControl,
@@ -36,11 +35,6 @@ import { getApiErrorMessage } from '@/utils/helpers';
 type Phase = 'loading' | 'ready' | 'error';
 
 const PAGE_SIZE = 10;
-
-// Tính năng chưa nối màn hình: báo cho người dùng thay vì để nút không phản hồi.
-function comingSoon() {
-  Alert.alert('Sắp có', 'Màn chỉnh sửa công thức đang được hoàn thiện.');
-}
 
 // "20 phút · 2 người"; công thức không ghi thời gian thì chỉ còn số người ăn.
 function formatMeta(recipe: MyRecipe): string {
@@ -169,6 +163,11 @@ export default function MyRecipesScreen() {
     router.push({ pathname: '/recipe/[id]', params: { id: String(recipe.id), source: 'LOCAL' } });
   };
 
+  // UC-19: mở form sửa của đúng công thức đó.
+  const openEdit = (recipe: MyRecipe) => {
+    router.push({ pathname: '/recipe/[id]/edit', params: { id: String(recipe.id) } });
+  };
+
   // Danh sách cursor không có tổng số: còn trang sau thì thêm "+".
   const countLabel = `Đã đăng · ${items.length}${hasMore ? '+' : ''}`;
 
@@ -247,8 +246,7 @@ export default function MyRecipesScreen() {
             )}
             <ManageRow
               recipe={item}
-              // TODO(C8): mở /recipe/[id]/edit khi màn sửa công thức đã có.
-              onEdit={comingSoon}
+              onEdit={() => openEdit(item)}
               onDelete={() => setPendingDelete(item)}
             />
           </View>
