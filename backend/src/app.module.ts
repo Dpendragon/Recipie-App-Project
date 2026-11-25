@@ -6,6 +6,7 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { IngredientsModule } from './ingredients/ingredients.module';
+import { NutritionModule } from './nutrition/nutrition.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
 
@@ -16,6 +17,7 @@ import { FavoritesModule } from './favorites/favorites.module';
     AuthModule,
     RecipesModule,
     IngredientsModule,
+    NutritionModule,
     ReviewsModule,
     FavoritesModule,
   ],
