@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import type { NutritionCoverage } from '../generated/prisma/enums';
 import { RecipeSource } from '../generated/prisma/enums';
 import { DELETED_AUTHOR_NAME } from '../reviews/reviews.service';
 import type {
@@ -7,6 +8,31 @@ import type {
   RecipeDetail,
   RecipeProvider,
 } from './recipe-provider.interface';
+
+// Dòng recipes kèm author và ingredients đã sắp theo sort_order.
+// quantity là DECIMAL nên Prisma trả về Decimal, không phải number.
+export type LocalRecipeRow = {
+  id: number;
+  title: string;
+  servings: number;
+  readyInMinutes: number | null;
+  diets: unknown;
+  dishTypes: unknown;
+  steps: string;
+  imageUrl: string | null;
+  videoUrl: string | null;
+  nutrition: unknown;
+  nutritionCoverage: NutritionCoverage | null;
+  author: { id: number; name: string | null; deletedAt: Date | null } | null;
+  ingredients: {
+    id: number;
+    nameVi: string;
+    nameEn: string | null;
+    quantity: unknown;
+    unit: string | null;
+    sortOrder: number;
+  }[];
+};
 
 // Cột steps là TEXT một chuỗi: tách theo dòng, chịu được \r\n, \n và \r.
 export function splitSteps(steps: string): string[] {
@@ -41,6 +67,34 @@ function parseLocalId(id: string): number | null {
   return /^\d+$/.test(id) ? Number(id) : null;
 }
 
+// Một chỗ duy nhất đổi dòng DB thành response: GET /recipes/:id và POST /recipes
+// phải trả về cùng định dạng.
+export function toRecipeDetail(recipe: LocalRecipeRow): RecipeDetail {
+  return {
+    id: String(recipe.id),
+    source: RecipeSource.LOCAL,
+    title: recipe.title,
+    imageUrl: recipe.imageUrl,
+    servings: recipe.servings,
+    readyInMinutes: recipe.readyInMinutes,
+    diets: toStringArray(recipe.diets),
+    dishTypes: toStringArray(recipe.dishTypes),
+    steps: splitSteps(recipe.steps),
+    videoUrl: recipe.videoUrl,
+    ingredients: recipe.ingredients.map((item) => ({
+      id: item.id,
+      nameVi: item.nameVi,
+      nameEn: item.nameEn,
+      quantity: item.quantity === null ? null : Number(item.quantity),
+      unit: item.unit,
+      sortOrder: item.sortOrder,
+    })),
+    nutrition: recipe.nutrition ?? null,
+    nutritionCoverage: recipe.nutritionCoverage,
+    author: toAuthor(recipe.author),
+  };
+}
+
 @Injectable()
 export class LocalDbProvider implements RecipeProvider {
   constructor(private readonly prisma: PrismaService) {}
@@ -64,28 +118,6 @@ export class LocalDbProvider implements RecipeProvider {
       throw new NotFoundException('Không tìm thấy công thức');
     }
 
-    return {
-      id: String(recipe.id),
-      source: RecipeSource.LOCAL,
-      title: recipe.title,
-      imageUrl: recipe.imageUrl,
-      servings: recipe.servings,
-      readyInMinutes: recipe.readyInMinutes,
-      diets: toStringArray(recipe.diets),
-      dishTypes: toStringArray(recipe.dishTypes),
-      steps: splitSteps(recipe.steps),
-      videoUrl: recipe.videoUrl,
-      ingredients: recipe.ingredients.map((item) => ({
-        id: item.id,
-        nameVi: item.nameVi,
-        nameEn: item.nameEn,
-        quantity: item.quantity === null ? null : Number(item.quantity),
-        unit: item.unit,
-        sortOrder: item.sortOrder,
-      })),
-      nutrition: recipe.nutrition ?? null,
-      nutritionCoverage: recipe.nutritionCoverage,
-      author: toAuthor(recipe.author),
-    };
+    return toRecipeDetail(recipe);
   }
 }

@@ -3,7 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RecipeSource } from '../generated/prisma/enums';
 import { normalizeRecipeId } from '../common/utils/recipe-id';
 import { ReviewsService } from '../reviews/reviews.service';
-import { LocalDbProvider } from './local-db.provider';
+import { LocalDbProvider, toRecipeDetail } from './local-db.provider';
+import { CreateRecipeDto } from './dto/create-recipe.dto';
 import type { RecipeDetailResponse } from './recipe-provider.interface';
 
 @Injectable()
@@ -36,6 +37,62 @@ export class RecipesService {
     ]);
 
     return { ...detail, rating, favoriteId };
+  }
+
+  // POST /recipes (UC-17). Công thức mới luôn là nguồn LOCAL.
+  async create(
+    userId: number,
+    dto: CreateRecipeDto,
+  ): Promise<RecipeDetailResponse> {
+    // Chỉ bọc phần ghi DB: nutrition (Mục 7.6) gọi API ngoài nên phải nằm ngoài
+    // transaction, thêm sau ở bước tính dinh dưỡng.
+    const row = await this.prisma.$transaction(async (tx) => {
+      const recipe = await tx.recipe.create({
+        data: {
+          authorId: userId,
+          title: dto.title,
+          servings: dto.servings,
+          readyInMinutes: dto.readyInMinutes ?? null,
+          // Cột JSON: bỏ qua field khi client không gửi để DB giữ NULL.
+          diets: dto.diets ?? undefined,
+          dishTypes: dto.dishTypes ?? undefined,
+          // Cột steps là TEXT một chuỗi, mỗi bước một dòng (xem splitSteps).
+          steps: dto.steps.join('\n'),
+          imageUrl: dto.imageUrl ?? null,
+          videoUrl: dto.videoUrl ?? null,
+        },
+        include: {
+          author: { select: { id: true, name: true, deletedAt: true } },
+        },
+      });
+
+      await tx.recipeIngredient.createMany({
+        data: dto.ingredients.map((item, index) => ({
+          recipeId: recipe.id,
+          nameVi: item.nameVi,
+          nameEn: item.nameEn ?? null,
+          quantity: item.quantity ?? null,
+          unit: item.unit ?? null,
+          // sort_order theo đúng thứ tự người dùng nhập.
+          sortOrder: index + 1,
+        })),
+      });
+
+      // createMany không trả về dòng vừa ghi (MySQL) nên phải đọc lại để có id.
+      const ingredients = await tx.recipeIngredient.findMany({
+        where: { recipeId: recipe.id },
+        orderBy: { sortOrder: 'asc' },
+      });
+
+      return { ...recipe, ingredients };
+    });
+
+    // Công thức mới chưa thể có đánh giá hay yêu thích, khỏi tra DB thêm.
+    return {
+      ...toRecipeDetail(row),
+      rating: { average: 0, count: 0 },
+      favoriteId: null,
+    };
   }
 
   // Đọc favorites bằng prisma trực tiếp để recipes không phụ thuộc FavoritesModule.
