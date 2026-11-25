@@ -12,6 +12,8 @@ export const colors = {
   error: '#AE4E3D', // chữ và viền báo lỗi
   errorBg: '#F7EDEC', // nền thông báo lỗi
   white: '#FFFFFF',
+  star: '#B7832F', // sao đánh giá
+  overlay: 'rgba(36,60,45,0.55)', // nền mờ phía sau bottom sheet
 } as const;
 
 // Toàn bộ app dùng font Inter.
@@ -24,5 +26,6 @@ export const fonts = {
 export const radius = {
   input: 10, // ô nhập, thông báo
   hero: 28, // ảnh lớn, banner xanh
+  card: 22, // thẻ món ăn
   pill: 100, // nút bấm bo tròn hoàn toàn
 } as const;
