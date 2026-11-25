@@ -1,17 +1,47 @@
-import { Injectable, NotImplementedException } from '@nestjs/common';
+import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { RecipeSource } from '../generated/prisma/enums';
+import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
+import { resolveLimit } from '../common/dto/pagination.dto';
 import { normalizeRecipeId } from '../common/utils/recipe-id';
 import { ReviewsService } from '../reviews/reviews.service';
+import { NutritionService } from '../nutrition/nutrition.service';
+import type { NutritionResult } from '../nutrition/nutrition.service';
 import { LocalDbProvider, toRecipeDetail } from './local-db.provider';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import type { RecipeDetailResponse } from './recipe-provider.interface';
 
+export type PageMeta = { nextCursor: number | null; hasMore: boolean };
+
+// Mục "Response chỉ được thêm trường": mỗi phần tử của GET /recipes/mine gồm
+// đúng 6 trường này. id là recipes.id (Int) và cũng là cursor của trang sau.
+export type MyRecipeItem = {
+  id: number;
+  title: string;
+  imageUrl: string | null;
+  readyInMinutes: number | null;
+  servings: number;
+  createdAt: Date;
+};
+
+// take = limit + 1: dòng thừa chỉ dùng để biết còn trang sau, không trả ra.
+function takePage<T extends { id: number }>(
+  rows: T[],
+  limit: number,
+): { data: T[]; meta: PageMeta } {
+  const hasMore = rows.length > limit;
+  const data = hasMore ? rows.slice(0, limit) : rows;
+  const nextCursor = hasMore ? data[data.length - 1].id : null;
+  return { data, meta: { nextCursor, hasMore } };
+}
+
 @Injectable()
 export class RecipesService {
+  private readonly logger = new Logger(RecipesService.name);
+
   constructor(
     private readonly localDbProvider: LocalDbProvider,
     private readonly reviewsService: ReviewsService,
+    private readonly nutritionService: NutritionService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -60,6 +90,10 @@ export class RecipesService {
           steps: dto.steps.join('\n'),
           imageUrl: dto.imageUrl ?? null,
           videoUrl: dto.videoUrl ?? null,
+          // Giá trị khởi tạo cho bước 8: nếu bước tính dinh dưỡng dưới đây
+          // không chạy được thì công thức vẫn nằm đúng ở trạng thái NONE
+          // (UC-17 ngoại lệ 8a), không phải NULL mập mờ.
+          nutritionCoverage: NutritionCoverage.NONE,
         },
         include: {
           author: { select: { id: true, name: true, deletedAt: true } },
@@ -87,12 +121,59 @@ export class RecipesService {
       return { ...recipe, ingredients };
     });
 
+    // UC-17 bước 8: tính dinh dưỡng NGOÀI transaction (Mục 7.6) vì bước này có
+    // thể gọi nguồn ngoài. Lỗi ở đây không được làm mất công thức vừa lưu
+    // (ngoại lệ 8a): chỉ ghi log và giữ coverage = NONE.
+    let nutrition: NutritionResult = {
+      nutrition: null,
+      coverage: NutritionCoverage.NONE,
+    };
+    try {
+      nutrition = await this.nutritionService.calculate(row.id);
+    } catch (error) {
+      this.logger.error(
+        `Không tính được dinh dưỡng cho công thức ${row.id}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+    }
+
     // Công thức mới chưa thể có đánh giá hay yêu thích, khỏi tra DB thêm.
     return {
       ...toRecipeDetail(row),
+      // row đọc trước khi tính nên nutrition của nó đã cũ.
+      nutrition: nutrition.nutrition,
+      nutritionCoverage: nutrition.coverage,
       rating: { average: 0, count: 0 },
       favoriteId: null,
     };
+  }
+
+  // GET /recipes/mine (UC-18). Chỉ công thức của chính người đang đăng nhập,
+  // id giảm dần, cursor-based theo ghi chú phân trang ở Mục 8.
+  async listMine(
+    userId: number,
+    query: { cursor?: number; limit?: number },
+  ): Promise<{ data: MyRecipeItem[]; meta: PageMeta }> {
+    const limit = resolveLimit(query.limit);
+
+    const rows = await this.prisma.recipe.findMany({
+      where: { authorId: userId },
+      select: {
+        id: true,
+        title: true,
+        imageUrl: true,
+        readyInMinutes: true,
+        servings: true,
+        createdAt: true,
+      },
+      orderBy: { id: 'desc' },
+      take: limit + 1,
+      ...(query.cursor === undefined
+        ? {}
+        : { cursor: { id: query.cursor }, skip: 1 }),
+    });
+
+    return takePage<MyRecipeItem>(rows, limit);
   }
 
   // Đọc favorites bằng prisma trực tiếp để recipes không phụ thuộc FavoritesModule.

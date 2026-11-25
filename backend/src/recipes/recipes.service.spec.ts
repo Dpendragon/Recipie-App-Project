@@ -1,10 +1,11 @@
-import { NotImplementedException } from '@nestjs/common';
+import { Logger, NotImplementedException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
 import { PrismaService } from '../prisma/prisma.service';
-import { RecipeSource } from '../generated/prisma/enums';
+import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
 import { ReviewsService } from '../reviews/reviews.service';
+import { NutritionService } from '../nutrition/nutrition.service';
 import { LocalDbProvider } from './local-db.provider';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
@@ -24,6 +25,10 @@ const reviewsServiceMock = {
   getRatingSummary: jest.fn(),
 };
 
+const nutritionServiceMock = {
+  calculate: jest.fn(),
+};
+
 const txMock = {
   recipe: { create: jest.fn() },
   recipeIngredient: { createMany: jest.fn(), findMany: jest.fn() },
@@ -31,6 +36,7 @@ const txMock = {
 
 const prismaMock = {
   favorite: { findUnique: jest.fn() },
+  recipe: { findMany: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -111,12 +117,17 @@ describe('RecipesService', () => {
     prismaMock.$transaction.mockImplementation(
       (fn: (tx: typeof txMock) => unknown) => fn(txMock),
     );
+    nutritionServiceMock.calculate.mockResolvedValue({
+      nutrition: null,
+      coverage: NutritionCoverage.NONE,
+    });
 
     const moduleRef = await Test.createTestingModule({
       providers: [
         RecipesService,
         { provide: LocalDbProvider, useValue: localDbProviderMock },
         { provide: ReviewsService, useValue: reviewsServiceMock },
+        { provide: NutritionService, useValue: nutritionServiceMock },
         { provide: PrismaService, useValue: prismaMock },
       ],
     }).compile();
@@ -361,7 +372,7 @@ describe('RecipesService', () => {
           },
         ],
         nutrition: null,
-        nutritionCoverage: null,
+        nutritionCoverage: NutritionCoverage.NONE,
         author: { id: 3, name: 'Nam' },
         rating: { average: 0, count: 0 },
         favoriteId: null,
@@ -369,6 +380,173 @@ describe('RecipesService', () => {
       // Công thức mới chưa thể có đánh giá hay yêu thích.
       expect(reviewsServiceMock.getRatingSummary).not.toHaveBeenCalled();
       expect(prismaMock.favorite.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('ghi nutrition_coverage = NONE ngay trong transaction (UC-17 8a)', async () => {
+      await service.create(3, dto());
+
+      expect(txMock.recipe.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            nutritionCoverage: NutritionCoverage.NONE,
+          }),
+        }),
+      );
+    });
+
+    it('tính dinh dưỡng NGOÀI transaction và trả coverage vừa tính', async () => {
+      const nutrition = {
+        calories: 320.5,
+        protein: 12,
+        fat: 8.25,
+        carbohydrates: 48,
+      };
+      nutritionServiceMock.calculate.mockResolvedValue({
+        nutrition,
+        coverage: NutritionCoverage.PARTIAL,
+      });
+
+      const result = await service.create(3, dto());
+
+      expect(nutritionServiceMock.calculate).toHaveBeenCalledWith(12);
+      // Chỉ nhận id: NutritionService tự dùng prisma của nó, không nhận tx.
+      expect(nutritionServiceMock.calculate.mock.calls[0]).toHaveLength(1);
+      expect(result.nutrition).toEqual(nutrition);
+      expect(result.nutritionCoverage).toBe(NutritionCoverage.PARTIAL);
+    });
+
+    it('coverage FULL khi mọi nguyên liệu quy đổi được', async () => {
+      nutritionServiceMock.calculate.mockResolvedValue({
+        nutrition: { calories: 100, protein: 5, fat: 2, carbohydrates: 10 },
+        coverage: NutritionCoverage.FULL,
+      });
+
+      const result = await service.create(3, dto());
+
+      expect(result.nutritionCoverage).toBe(NutritionCoverage.FULL);
+    });
+
+    it('NutritionService lỗi thì công thức vẫn lưu, coverage NONE, không ném lỗi', async () => {
+      nutritionServiceMock.calculate.mockRejectedValue(
+        new Error('Spoonacular timeout'),
+      );
+      // Service ghi log lỗi: chặn lại để output test không nhiễu.
+      const logSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      const result = await service.create(3, dto());
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(result.id).toBe('12');
+      expect(result.nutrition).toBeNull();
+      expect(result.nutritionCoverage).toBe(NutritionCoverage.NONE);
+      expect(logSpy).toHaveBeenCalled();
+
+      logSpy.mockRestore();
+    });
+  });
+
+  describe('listMine (UC-18)', () => {
+    const rows = [
+      {
+        id: 12,
+        title: 'Phở bò',
+        imageUrl: null,
+        readyInMinutes: 90,
+        servings: 2,
+        createdAt: new Date('2026-01-02T00:00:00.000Z'),
+      },
+      {
+        id: 5,
+        title: 'Bún chả',
+        imageUrl: 'https://img/5.jpg',
+        readyInMinutes: null,
+        servings: 4,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+      },
+    ];
+
+    it('chỉ lấy công thức của chính mình, id giảm dần', async () => {
+      prismaMock.recipe.findMany.mockResolvedValue(rows);
+
+      const result = await service.listMine(3, {});
+
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { authorId: 3 },
+          orderBy: { id: 'desc' },
+          take: 21,
+        }),
+      );
+      // Không có cursor thì không được gửi cursor/skip.
+      const args = prismaMock.recipe.findMany.mock.calls[0][0] as Record<
+        string,
+        unknown
+      >;
+      expect(args.cursor).toBeUndefined();
+      expect(args.skip).toBeUndefined();
+      expect(result).toEqual({
+        data: rows,
+        meta: { nextCursor: null, hasMore: false },
+      });
+    });
+
+    it('mỗi phần tử chỉ gồm 6 trường theo đặc tả', async () => {
+      prismaMock.recipe.findMany.mockResolvedValue(rows);
+
+      await service.listMine(3, {});
+
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: {
+            id: true,
+            title: true,
+            imageUrl: true,
+            readyInMinutes: true,
+            servings: true,
+            createdAt: true,
+          },
+        }),
+      );
+    });
+
+    it('còn trang sau thì cắt dòng thừa và trả nextCursor', async () => {
+      prismaMock.recipe.findMany.mockResolvedValue(rows);
+
+      const result = await service.listMine(3, { limit: 1 });
+
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 2 }),
+      );
+      expect(result.data).toEqual([rows[0]]);
+      expect(result.meta).toEqual({ nextCursor: 12, hasMore: true });
+    });
+
+    it('có cursor thì bỏ qua đúng dòng của trang trước', async () => {
+      prismaMock.recipe.findMany.mockResolvedValue([rows[1]]);
+
+      const result = await service.listMine(3, { cursor: 12, limit: 20 });
+
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ cursor: { id: 12 }, skip: 1 }),
+      );
+      expect(result.meta).toEqual({ nextCursor: null, hasMore: false });
+    });
+
+    it('limit vượt mức tối đa bị kẹp về 50', async () => {
+      prismaMock.recipe.findMany.mockResolvedValue([]);
+
+      const result = await service.listMine(3, { limit: 999 });
+
+      expect(prismaMock.recipe.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ take: 51 }),
+      );
+      // Chưa đăng công thức nào: danh sách rỗng, không lỗi (UC-18 ngoại lệ 2a).
+      expect(result).toEqual({
+        data: [],
+        meta: { nextCursor: null, hasMore: false },
+      });
     });
   });
 });

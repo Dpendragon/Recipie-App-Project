@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { RecipeDetailQueryDto } from './dto/recipe-detail-query.dto';
@@ -17,6 +18,11 @@ export class RecipesController {
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateRecipeDto) {
     return this.recipesService.create(user.id, dto);
+  }
+
+  @Get('mine')
+  listMine(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.recipesService.listMine(user.id, query);
   }
 
   @Get(':id')
