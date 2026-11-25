@@ -1,4 +1,9 @@
-import { Logger, NotImplementedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Logger,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
 import { validateSync } from 'class-validator';
@@ -9,6 +14,7 @@ import { NutritionService } from '../nutrition/nutrition.service';
 import { LocalDbProvider } from './local-db.provider';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
+import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import type { RecipeDetail } from './recipe-provider.interface';
 
 const detail = {
@@ -30,13 +36,19 @@ const nutritionServiceMock = {
 };
 
 const txMock = {
-  recipe: { create: jest.fn() },
-  recipeIngredient: { createMany: jest.fn(), findMany: jest.fn() },
+  recipe: { create: jest.fn(), update: jest.fn() },
+  recipeIngredient: {
+    createMany: jest.fn(),
+    findMany: jest.fn(),
+    deleteMany: jest.fn(),
+  },
 };
 
 const prismaMock = {
-  favorite: { findUnique: jest.fn() },
-  recipe: { findMany: jest.fn() },
+  favorite: { findUnique: jest.fn(), deleteMany: jest.fn() },
+  recipeReview: { deleteMany: jest.fn() },
+  mealPlanEntry: { deleteMany: jest.fn() },
+  recipe: { findMany: jest.fn(), findUnique: jest.fn(), delete: jest.fn() },
   $transaction: jest.fn(),
 };
 
@@ -100,6 +112,41 @@ describe('CreateRecipeDto', () => {
 
     expect(errors).toHaveLength(1);
     expect(errors[0].property).toBe('ingredients');
+  });
+});
+
+describe('UpdateRecipeDto', () => {
+  function errorsFor(payload: Record<string, unknown>) {
+    return validateSync(plainToInstance(UpdateRecipeDto, payload));
+  }
+
+  it('chấp nhận body chỉ có một field', () => {
+    expect(errorsFor({ title: 'Phở gà' })).toHaveLength(0);
+  });
+
+  it('chấp nhận body rỗng (không sửa gì)', () => {
+    expect(errorsFor({})).toHaveLength(0);
+  });
+
+  it('gửi ingredients thì phải có ít nhất 1 phần tử', () => {
+    const errors = errorsFor({ ingredients: [] });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('ingredients');
+  });
+
+  it('vẫn kiểm tra từng nguyên liệu khi có gửi', () => {
+    const errors = errorsFor({ ingredients: [{ unit: 'g' }] });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('ingredients');
+  });
+
+  it('gửi title rỗng vẫn bị từ chối', () => {
+    const errors = errorsFor({ title: '   ' });
+
+    expect(errors).toHaveLength(1);
+    expect(errors[0].property).toBe('title');
   });
 });
 
@@ -547,6 +594,300 @@ describe('RecipesService', () => {
         data: [],
         meta: { nextCursor: null, hasMore: false },
       });
+    });
+  });
+
+  // Dòng recipes của user 3 kèm đúng một nguyên liệu "Bánh phở 200 g".
+  // quantity từ DB là Decimal nên mô phỏng bằng object có toString.
+  const ownedRecipe = {
+    id: 12,
+    authorId: 3,
+    servings: 2,
+    ingredients: [
+      {
+        nameVi: 'Bánh phở',
+        nameEn: 'Rice noodles',
+        quantity: { toString: () => '200.00' },
+        unit: 'g',
+      },
+    ],
+  };
+
+  // Danh sách y nguyên dòng đang lưu, dùng để kiểm tra nhánh "không đổi".
+  const sameIngredients = [
+    { nameVi: 'Bánh phở', nameEn: 'Rice noodles', quantity: 200, unit: 'g' },
+  ];
+
+  function updateDto(payload: Record<string, unknown>) {
+    return plainToInstance(UpdateRecipeDto, payload);
+  }
+
+  describe('update (UC-19)', () => {
+    beforeEach(() => {
+      prismaMock.recipe.findUnique.mockResolvedValue(ownedRecipe);
+      txMock.recipe.update.mockResolvedValue(ownedRecipe);
+      txMock.recipeIngredient.deleteMany.mockResolvedValue({ count: 1 });
+      txMock.recipeIngredient.createMany.mockResolvedValue({ count: 1 });
+    });
+
+    it('công thức của người khác thì 403 và không ghi gì', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue({
+        ...ownedRecipe,
+        authorId: 99,
+      });
+
+      await expect(
+        service.update(3, '12', updateDto({ title: 'Phở gà' })),
+      ).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+      expect(nutritionServiceMock.calculate).not.toHaveBeenCalled();
+    });
+
+    it('công thức không tồn tại thì 404', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.update(3, '12', updateDto({ title: 'Phở gà' })),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('id không phải số thì 404, không tra DB', async () => {
+      await expect(
+        service.update(3, 'abc', updateDto({ title: 'Phở gà' })),
+      ).rejects.toThrow(NotFoundException);
+      expect(prismaMock.recipe.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('sửa tên: KHÔNG tính lại dinh dưỡng, không chạm recipe_ingredients', async () => {
+      await service.update(3, '12', updateDto({ title: 'Phở gà' }));
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(txMock.recipe.update).toHaveBeenCalledWith({
+        where: { id: 12 },
+        data: expect.objectContaining({ title: 'Phở gà' }),
+      });
+      expect(txMock.recipeIngredient.deleteMany).not.toHaveBeenCalled();
+      expect(txMock.recipeIngredient.createMany).not.toHaveBeenCalled();
+      expect(nutritionServiceMock.calculate).not.toHaveBeenCalled();
+    });
+
+    it('sửa ảnh, video và các bước cũng KHÔNG tính lại dinh dưỡng', async () => {
+      await service.update(
+        3,
+        '12',
+        updateDto({
+          imageUrl: 'https://img/12.jpg',
+          videoUrl: 'https://video/12.mp4',
+          steps: ['Ninh xương', 'Chan nước dùng', 'Thêm hành'],
+        }),
+      );
+
+      expect(txMock.recipe.update).toHaveBeenCalledWith({
+        where: { id: 12 },
+        data: expect.objectContaining({
+          imageUrl: 'https://img/12.jpg',
+          videoUrl: 'https://video/12.mp4',
+          // Cột steps là TEXT: mỗi bước một dòng, giống UC-17.
+          steps: 'Ninh xương\nChan nước dùng\nThêm hành',
+        }),
+      });
+      expect(nutritionServiceMock.calculate).not.toHaveBeenCalled();
+    });
+
+    it('sửa servings thì tính lại dinh dưỡng', async () => {
+      await service.update(3, '12', updateDto({ servings: 4 }));
+
+      expect(nutritionServiceMock.calculate).toHaveBeenCalledWith(12);
+      // NutritionService tự dùng prisma của nó, không nhận tx.
+      expect(nutritionServiceMock.calculate.mock.calls[0]).toHaveLength(1);
+    });
+
+    it('gửi servings y như cũ thì không tính lại', async () => {
+      await service.update(3, '12', updateDto({ servings: 2 }));
+
+      expect(nutritionServiceMock.calculate).not.toHaveBeenCalled();
+    });
+
+    it('đổi nguyên liệu: xoá rồi tạo lại theo thứ tự mới và tính lại', async () => {
+      await service.update(
+        3,
+        '12',
+        updateDto({
+          ingredients: [
+            { nameVi: 'Hành lá' },
+            {
+              nameVi: 'Bánh phở',
+              nameEn: 'Rice noodles',
+              quantity: 300,
+              unit: 'g',
+            },
+          ],
+        }),
+      );
+
+      expect(txMock.recipeIngredient.deleteMany).toHaveBeenCalledWith({
+        where: { recipeId: 12 },
+      });
+      expect(txMock.recipeIngredient.createMany).toHaveBeenCalledWith({
+        data: [
+          {
+            recipeId: 12,
+            nameVi: 'Hành lá',
+            nameEn: null,
+            quantity: null,
+            unit: null,
+            sortOrder: 1,
+          },
+          {
+            recipeId: 12,
+            nameVi: 'Bánh phở',
+            nameEn: 'Rice noodles',
+            quantity: 300,
+            unit: 'g',
+            sortOrder: 2,
+          },
+        ],
+      });
+      expect(nutritionServiceMock.calculate).toHaveBeenCalledWith(12);
+    });
+
+    it('chỉ đổi quantity của một nguyên liệu cũng tính lại', async () => {
+      await service.update(
+        3,
+        '12',
+        updateDto({
+          ingredients: [
+            {
+              nameVi: 'Bánh phở',
+              nameEn: 'Rice noodles',
+              quantity: 250,
+              unit: 'g',
+            },
+          ],
+        }),
+      );
+
+      expect(nutritionServiceMock.calculate).toHaveBeenCalledWith(12);
+    });
+
+    it('gửi lại nguyên liệu y nguyên thì giữ dòng cũ và không tính lại', async () => {
+      await service.update(
+        3,
+        '12',
+        updateDto({ title: 'Phở gà', ingredients: sameIngredients }),
+      );
+
+      // Giữ dòng cũ để không mất ingredient_id đã đối chiếu (Mục 7.3).
+      expect(txMock.recipeIngredient.deleteMany).not.toHaveBeenCalled();
+      expect(txMock.recipeIngredient.createMany).not.toHaveBeenCalled();
+      expect(nutritionServiceMock.calculate).not.toHaveBeenCalled();
+    });
+
+    it('recipes và recipe_ingredients nằm trong cùng một transaction', async () => {
+      await service.update(
+        3,
+        '12',
+        updateDto({ ingredients: [{ nameVi: 'Hành lá' }] }),
+      );
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      // Cả ba lệnh ghi đều dùng tx, không dùng prisma ngoài transaction.
+      expect(txMock.recipe.update).toHaveBeenCalledTimes(1);
+      expect(txMock.recipeIngredient.deleteMany).toHaveBeenCalledTimes(1);
+      expect(txMock.recipeIngredient.createMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('NutritionService lỗi thì phần đã sửa vẫn giữ, không ném lỗi', async () => {
+      nutritionServiceMock.calculate.mockRejectedValue(
+        new Error('Spoonacular timeout'),
+      );
+      const logSpy = jest
+        .spyOn(Logger.prototype, 'error')
+        .mockImplementation(() => undefined);
+
+      const result = await service.update(3, '12', updateDto({ servings: 4 }));
+
+      expect(prismaMock.$transaction).toHaveBeenCalledTimes(1);
+      expect(result.id).toBe('1');
+      expect(logSpy).toHaveBeenCalled();
+
+      logSpy.mockRestore();
+    });
+
+    it('trả về chi tiết đọc lại sau khi sửa, cùng định dạng GET /recipes/:id', async () => {
+      prismaMock.favorite.findUnique.mockResolvedValue({ id: 42 });
+
+      const result = await service.update(3, '12', updateDto({ title: 'X' }));
+
+      expect(localDbProviderMock.getById).toHaveBeenCalledWith('12');
+      expect(result).toEqual({
+        ...detail,
+        rating: { average: 4.5, count: 2 },
+        favoriteId: 42,
+      });
+    });
+  });
+
+  describe('remove (UC-20)', () => {
+    beforeEach(() => {
+      prismaMock.recipe.findUnique.mockResolvedValue(ownedRecipe);
+      prismaMock.recipe.delete.mockResolvedValue(ownedRecipe);
+    });
+
+    it('công thức của người khác thì 403 và không xoá gì', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue({
+        ...ownedRecipe,
+        authorId: 99,
+      });
+
+      await expect(service.remove(3, '12')).rejects.toThrow(ForbiddenException);
+      expect(prismaMock.recipe.delete).not.toHaveBeenCalled();
+    });
+
+    it('công thức không tồn tại thì 404', async () => {
+      prismaMock.recipe.findUnique.mockResolvedValue(null);
+
+      await expect(service.remove(3, '12')).rejects.toThrow(NotFoundException);
+      expect(prismaMock.recipe.delete).not.toHaveBeenCalled();
+    });
+
+    it('id không phải số thì 404, không tra DB', async () => {
+      await expect(service.remove(3, 'abc')).rejects.toThrow(NotFoundException);
+      expect(prismaMock.recipe.findUnique).not.toHaveBeenCalled();
+    });
+
+    it('chỉ xoá recipes; recipe_ingredients để CASCADE tự xoá', async () => {
+      await service.remove(3, '12');
+
+      expect(prismaMock.recipe.delete).toHaveBeenCalledWith({
+        where: { id: 12 },
+      });
+      // Không xoá tay bảng con: FK recipe_ingredients.recipe_id là CASCADE.
+      expect(txMock.recipeIngredient.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('không xoá favorites, recipe_reviews, meal_plan_entries của ai', async () => {
+      await service.remove(3, '12');
+
+      // Quy tắc nghiệp vụ UC-20: nội dung do người khác tạo được giữ lại.
+      expect(prismaMock.favorite.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.recipeReview.deleteMany).not.toHaveBeenCalled();
+      expect(prismaMock.mealPlanEntry.deleteMany).not.toHaveBeenCalled();
+    });
+
+    it('xoá xong thì GET /recipes/:id?source=LOCAL trả 404', async () => {
+      await service.remove(3, '12');
+
+      // Dòng recipes đã mất nên provider không tìm thấy nữa.
+      localDbProviderMock.getById.mockRejectedValue(
+        new NotFoundException('Không tìm thấy công thức'),
+      );
+
+      await expect(
+        service.getById('12', RecipeSource.LOCAL, 7),
+      ).rejects.toThrow(new NotFoundException('Không tìm thấy công thức'));
     });
   });
 });

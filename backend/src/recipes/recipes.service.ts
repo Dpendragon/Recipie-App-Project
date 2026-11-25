@@ -1,13 +1,21 @@
-import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  NotImplementedException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
 import { resolveLimit } from '../common/dto/pagination.dto';
-import { normalizeRecipeId } from '../common/utils/recipe-id';
+import { isLocalId, normalizeRecipeId } from '../common/utils/recipe-id';
 import { ReviewsService } from '../reviews/reviews.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import type { NutritionResult } from '../nutrition/nutrition.service';
 import { LocalDbProvider, toRecipeDetail } from './local-db.provider';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
+import type { CreateRecipeIngredientDto } from './dto/create-recipe.dto';
+import { UpdateRecipeDto } from './dto/update-recipe.dto';
 import type { RecipeDetailResponse } from './recipe-provider.interface';
 
 export type PageMeta = { nextCursor: number | null; hasMore: boolean };
@@ -33,6 +41,29 @@ function takePage<T extends { id: number }>(
   const nextCursor = hasMore ? data[data.length - 1].id : null;
   return { data, meta: { nextCursor, hasMore } };
 }
+
+// Chữ ký của một danh sách nguyên liệu, dùng để so sánh trước và sau khi sửa.
+// quantity từ DB là Decimal nên phải ép về number để "200" và "200.00" bằng nhau.
+function ingredientsKey(
+  items: {
+    nameVi: string;
+    nameEn?: string | null;
+    quantity?: unknown;
+    unit?: string | null;
+  }[],
+): string {
+  return JSON.stringify(
+    items.map((item) => [
+      item.nameVi,
+      item.nameEn ?? null,
+      item.quantity === null || item.quantity === undefined
+        ? null
+        : Number(item.quantity),
+      item.unit ?? null,
+    ]),
+  );
+}
+
 
 @Injectable()
 export class RecipesService {
@@ -174,6 +205,149 @@ export class RecipesService {
     });
 
     return takePage<MyRecipeItem>(rows, limit);
+  }
+
+  // PATCH /recipes/:id (UC-19). Chỉ tác giả sửa được công thức của mình.
+  async update(
+    userId: number,
+    id: string,
+    dto: UpdateRecipeDto,
+  ): Promise<RecipeDetailResponse> {
+    const current = await this.findOwnRecipe(userId, id);
+
+    // Chỉ ghi lại nguyên liệu khi danh sách gửi lên thực sự khác danh sách đang
+    // lưu: form sửa luôn gửi cả danh sách, mà xoá rồi tạo lại sẽ mất
+    // ingredient_id đã đối chiếu được (Mục 7.3).
+    const sent = Array.isArray(dto.ingredients) ? dto.ingredients : null;
+    const nextIngredients: CreateRecipeIngredientDto[] | null =
+      sent !== null &&
+      ingredientsKey(sent) !== ingredientsKey(current.ingredients)
+        ? sent
+        : null;
+
+    const servingsChanged =
+      dto.servings !== undefined &&
+      dto.servings !== null &&
+      dto.servings !== current.servings;
+
+    // UC-19 bước 5: recipes và recipe_ingredients đi cùng một transaction.
+    // Field vắng mặt để undefined cho Prisma bỏ qua, tức là "không sửa phần đó".
+    await this.prisma.$transaction(async (tx) => {
+      await tx.recipe.update({
+        where: { id: current.id },
+        data: {
+          // Ba cột NOT NULL: client gửi null thì coi như không sửa, không ghi
+          // NULL xuống DB.
+          title: dto.title ?? undefined,
+          servings: dto.servings ?? undefined,
+          steps: dto.steps?.join('\n'),
+          // Cột JSON nullable cần Prisma.DbNull mới ghi được NULL, nên ở đây
+          // chỉ nhận giá trị mới chứ không nhận lệnh xoá.
+          diets: dto.diets ?? undefined,
+          dishTypes: dto.dishTypes ?? undefined,
+          // Cột nullable thường: gửi null là xoá giá trị cũ.
+          readyInMinutes: dto.readyInMinutes,
+          imageUrl: dto.imageUrl,
+          videoUrl: dto.videoUrl,
+        },
+      });
+
+      if (nextIngredients !== null) {
+        // Đồng bộ lại: xoá hết rồi tạo lại để sort_order khớp thứ tự mới.
+        await tx.recipeIngredient.deleteMany({
+          where: { recipeId: current.id },
+        });
+        await tx.recipeIngredient.createMany({
+          data: nextIngredients.map((item, index) => ({
+            recipeId: current.id,
+            nameVi: item.nameVi,
+            nameEn: item.nameEn ?? null,
+            quantity: item.quantity ?? null,
+            unit: item.unit ?? null,
+            sortOrder: index + 1,
+          })),
+        });
+      }
+    });
+
+    // Mục 7.6: chỉ tính lại khi nguyên liệu, quantity, unit hoặc servings đổi.
+    // Đổi tên món, ảnh, video hay các bước thì giữ nguyên dinh dưỡng cũ.
+    // Giống UC-17, bước này nằm NGOÀI transaction và lỗi ở đây không được làm
+    // mất phần đã sửa.
+    if (nextIngredients !== null || servingsChanged) {
+      try {
+        await this.nutritionService.calculate(current.id);
+      } catch (error) {
+        this.logger.error(
+          `Không tính lại được dinh dưỡng cho công thức ${current.id}`,
+          error instanceof Error ? error.stack : String(error),
+        );
+      }
+    }
+
+    // Đọc lại để trả về đúng định dạng GET /recipes/:id (kèm rating, favoriteId).
+    return this.getById(id, RecipeSource.LOCAL, userId);
+  }
+
+  // DELETE /recipes/:id (UC-20). Chỉ tác giả xoá được công thức của mình.
+  async remove(userId: number, id: string): Promise<void> {
+    const current = await this.findOwnRecipe(userId, id);
+
+    // Chỉ xoá dòng recipes: recipe_ingredients tự xoá theo ON DELETE CASCADE
+    // (Mục 7.11). favorites, recipe_reviews và meal_plan_entries không có FK
+    // cứng tới recipes nên vừa không bị xoá theo, vừa không chặn lệnh xoá này —
+    // các FK RESTRICT trong schema đều trỏ tới users, không phải recipes. Nội
+    // dung người khác tạo được giữ lại theo quy tắc nghiệp vụ của UC-20.
+    await this.prisma.recipe.delete({ where: { id: current.id } });
+  }
+
+  // Dùng chung cho UC-19 và UC-20: không tồn tại thì 404, không phải của mình
+  // thì 403 (ghi chú Mục 8 và ngoại lệ 4a của cả hai use case).
+  private async findOwnRecipe(
+    userId: number,
+    id: string,
+  ): Promise<{
+    id: number;
+    servings: number;
+    ingredients: {
+      nameVi: string;
+      nameEn: string | null;
+      quantity: unknown;
+      unit: string | null;
+    }[];
+  }> {
+    // Id sai định dạng cũng coi như không tồn tại, giống UC-08.
+    if (!isLocalId(id)) {
+      throw new NotFoundException('Không tìm thấy công thức');
+    }
+
+    const recipe = await this.prisma.recipe.findUnique({
+      where: { id: Number(id) },
+      select: {
+        id: true,
+        authorId: true,
+        servings: true,
+        ingredients: {
+          select: {
+            nameVi: true,
+            nameEn: true,
+            quantity: true,
+            unit: true,
+          },
+          orderBy: { sortOrder: 'asc' },
+        },
+      },
+    });
+
+    if (!recipe) {
+      throw new NotFoundException('Không tìm thấy công thức');
+    }
+
+    if (recipe.authorId !== userId) {
+      throw new ForbiddenException('Bạn không có quyền với công thức này');
+    }
+
+    return recipe;
   }
 
   // Đọc favorites bằng prisma trực tiếp để recipes không phụ thuộc FavoritesModule.
