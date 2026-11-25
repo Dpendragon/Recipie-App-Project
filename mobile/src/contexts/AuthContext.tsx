@@ -7,6 +7,8 @@ import {
 } from 'react';
 import { deleteToken, getToken, setToken } from '@/services/auth/authStorage';
 import { getProfile } from '@/services/api/authApi';
+import { clearCacheForUser } from '@/services/cache/cacheManager';
+import { decodeUserIdFromToken } from '@/hooks/useCurrentUserId';
 
 type AuthStatus = 'loading' | 'signedIn' | 'signedOut' | 'offline';
 
@@ -19,6 +21,22 @@ export type AuthContextValue = {
 };
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
+
+// Xoá cache offline của tài khoản đang đăng xuất (ghi chú cuối Mục 7.12): đọc
+// userId từ token CÒN trong storage, nên phải gọi trước deleteToken. Dùng cho cả
+// đăng xuất chủ động và đăng xuất cưỡng bức khi token hết hạn. Xoá cache thất bại
+// không được chặn đăng xuất — token vẫn phải bị xoá.
+async function clearCacheOfCurrentUser() {
+  try {
+    const token = await getToken();
+    const userId = token ? decodeUserIdFromToken(token) : null;
+    if (userId !== null) {
+      await clearCacheForUser(userId);
+    }
+  } catch (error) {
+    console.warn('[AuthContext] Xoá cache khi đăng xuất thất bại', error);
+  }
+}
 
 export function AuthProvider({ children }: PropsWithChildren) {
   const [status, setStatus] = useState<AuthStatus>('loading');
@@ -39,6 +57,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
       setStatus('signedIn');
     } catch (error: any) {
       if (error?.response?.status === 401) {
+        await clearCacheOfCurrentUser();
         await deleteToken();
         setSessionExpired(true);
         setStatus('signedOut');
@@ -59,6 +78,7 @@ export function AuthProvider({ children }: PropsWithChildren) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await clearCacheOfCurrentUser();
     await deleteToken();
     setSessionExpired(false);
     setStatus('signedOut');
