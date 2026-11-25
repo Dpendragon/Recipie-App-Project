@@ -28,5 +28,6 @@ export const extraColors = {
   star: '#C58A35', // sao đánh giá
   dangerBg: '#FAEDE8', // nền nút "Xóa đánh giá"
   disabledBg: '#DDE2D7', // nền nút gửi khi chưa chọn sao
+  fieldSoft: '#F0F1E9', // nền ô phụ trong thẻ nguyên liệu (số lượng, đơn vị, tên tiếng Anh)
   overlay: 'rgba(0,0,0,0.4)', // lớp phủ sau hộp thoại xác nhận
 } as const;

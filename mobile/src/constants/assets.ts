@@ -49,6 +49,16 @@ export const icons = {
   // Đánh giá (UC-12 → UC-16)
   starOutline: icon(require('../../assets/icons/rv-star-outline.svg'), 35, 35), // sao chưa chọn
   starFilled: icon(require('../../assets/icons/rv-star-filled.svg'), 35, 35), // sao đã chọn
+
+  // Đăng và sửa công thức (UC-17, UC-19). Bản 19px màu xám của clock-3 và
+  // users-round: rd-clock, rd-users là cùng hình nhưng 21px màu xanh của màn chi tiết.
+  formServings: icon(require('../../assets/icons/rf-users.svg'), 19, 19), // ô "Số người ăn"
+  formMinutes: icon(require('../../assets/icons/rf-clock.svg'), 19, 19), // ô "Thời gian (phút)"
+  formLink: icon(require('../../assets/icons/rf-link.svg'), 19, 19), // ô "Liên kết video"
+  formTrash: icon(require('../../assets/icons/rf-trash.svg'), 16, 16), // xoá nguyên liệu, xoá bước
+  formPlus: icon(require('../../assets/icons/rf-plus.svg'), 19, 19), // nút thêm nguyên liệu, thêm bước
+  formPencil: icon(require('../../assets/icons/rf-pencil.svg'), 18, 18), // banner "Đang sửa món đã đăng"
+  formSalad: icon(require('../../assets/icons/rf-salad.svg'), 18, 18), // banner ghi chú dinh dưỡng
 };
 
 export const images = {
