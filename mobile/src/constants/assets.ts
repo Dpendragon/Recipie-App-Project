@@ -59,6 +59,11 @@ export const icons = {
   formPlus: icon(require('../../assets/icons/rf-plus.svg'), 19, 19), // nút thêm nguyên liệu, thêm bước
   formPencil: icon(require('../../assets/icons/rf-pencil.svg'), 18, 18), // banner "Đang sửa món đã đăng"
   formSalad: icon(require('../../assets/icons/rf-salad.svg'), 18, 18), // banner ghi chú dinh dưỡng
+
+  // Công thức của tôi (UC-18, UC-20). Cùng hình notebook-pen nhưng hai bản khác
+  // nét: 18px cho banner ghi chú, 34px (nét 1.5) cho minh hoạ danh sách rỗng.
+  notebookPen: icon(require('../../assets/icons/mr-notebook-pen.svg'), 18, 18),
+  notebookPenEmpty: icon(require('../../assets/icons/mr-notebook-pen-lg.svg'), 34, 34),
 };
 
 export const images = {
