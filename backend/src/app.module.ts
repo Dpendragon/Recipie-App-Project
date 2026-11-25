@@ -6,6 +6,9 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { IngredientsModule } from './ingredients/ingredients.module';
+import { ShoppingItemsModule } from './shopping-items/shopping-items.module';
+import { MealPlanModule } from './meal-plan/meal-plan.module';
+import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
@@ -14,6 +17,9 @@ import { IngredientsModule } from './ingredients/ingredients.module';
     AuthModule,
     IngredientsModule,
     RecipesModule,
+    ShoppingItemsModule,
+    MealPlanModule,
+    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
