@@ -99,6 +99,9 @@ export async function getRecipeDetail(params: {
       steps: recipe.steps,
       videoUrl: recipe.videoUrl,
       nutrition: recipe.nutrition,
+      servings: recipe.servings,
+      readyInMinutes: recipe.readyInMinutes,
+      nutritionCoverage: recipe.nutritionCoverage,
       // Backend cũ chưa trả favoriteId; undefined thì giữ nguyên giá trị đã có.
       favoriteId: recipe.favoriteId,
     }),
@@ -148,6 +151,9 @@ export async function saveFavorite(params: {
       steps: recipe.steps,
       videoUrl: recipe.videoUrl,
       nutrition: recipe.nutrition,
+      servings: recipe.servings,
+      readyInMinutes: recipe.readyInMinutes,
+      nutritionCoverage: recipe.nutritionCoverage,
       favoriteId: favorite.id,
     }),
   );

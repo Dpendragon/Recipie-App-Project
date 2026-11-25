@@ -1,4 +1,5 @@
 import type {
+  NutritionCoverage,
   RecipeIngredient,
   RecipeNutrition,
   RecipeSource,
@@ -9,8 +10,7 @@ import { CACHED_RECIPES_TABLE, getDatabase } from './database';
 // đọc/ghi cache — đó là việc của cacheManager.ts.
 
 // Cache chỉ giữ đúng các cột ở Mục 7.12, không đủ để dựng lại RecipeDetail
-// (thiếu servings, readyInMinutes, diets, dishTypes, nutritionCoverage), nên
-// màn ngoại tuyến dùng kiểu riêng này.
+// (thiếu diets, dishTypes...), nên màn ngoại tuyến dùng kiểu riêng này.
 export interface CachedRecipe {
   userId: number;
   recipeId: string;
@@ -22,6 +22,11 @@ export interface CachedRecipe {
   videoUrl: string | null;
   nutrition: RecipeNutrition | null;
   favoriteId: number | null;
+  // Ba trường thêm ở schema v2: null với dòng do bản app cũ (v1) ghi, cho tới
+  // khi UC-09 ghi lại hoặc UC-08 làm mới dòng đó khi có mạng.
+  servings: number | null;
+  readyInMinutes: number | null;
+  nutritionCoverage: NutritionCoverage | null;
   // ISO datetime string, thời điểm ghi/ghi đè dòng này gần nhất.
   cachedAt: string;
 }
@@ -37,6 +42,9 @@ export interface CachedRecipeDetailPatch {
   steps: string[];
   videoUrl: string | null;
   nutrition: RecipeNutrition | null;
+  servings: number | null;
+  readyInMinutes: number | null;
+  nutritionCoverage: NutritionCoverage | null;
   // Bỏ trống thì giữ nguyên favorite_id đang có.
   favoriteId?: number | null;
 }
@@ -53,7 +61,17 @@ type CachedRecipeRow = {
   nutrition: string | null;
   favorite_id: number | null;
   cached_at: string;
+  servings: number | null;
+  ready_in_minutes: number | null;
+  nutrition_coverage: string | null;
 };
+
+const NUTRITION_COVERAGE_VALUES: readonly NutritionCoverage[] = ['FULL', 'PARTIAL', 'NONE'];
+
+// Cột TEXT không ràng buộc giá trị; giá trị lạ (bản app khác ghi) coi như thiếu.
+function parseNutritionCoverage(raw: string | null): NutritionCoverage | null {
+  return NUTRITION_COVERAGE_VALUES.find((value) => value === raw) ?? null;
+}
 
 // "7" và "007" phải trỏ tới cùng một dòng cache, giống cách backend chuẩn hoá
 // recipe_id của nguồn LOCAL trước khi ghi vào MySQL.
@@ -99,6 +117,10 @@ function toCachedRecipe(row: CachedRecipeRow): CachedRecipe {
     videoUrl: row.video_url,
     nutrition: parseJson<RecipeNutrition | null>(row.nutrition, null),
     favoriteId: row.favorite_id,
+    // ?? null: phòng driver trả undefined cho cột vừa ALTER TABLE thêm vào.
+    servings: row.servings ?? null,
+    readyInMinutes: row.ready_in_minutes ?? null,
+    nutritionCoverage: parseNutritionCoverage(row.nutrition_coverage ?? null),
     cachedAt: row.cached_at,
   };
 }
@@ -109,8 +131,9 @@ export async function upsertFull(input: CachedRecipeInput): Promise<void> {
   await db.runAsync(
     `INSERT OR REPLACE INTO ${CACHED_RECIPES_TABLE}
        (user_id, recipe_id, source, title, image_url, ingredients, steps,
-        video_url, nutrition, favorite_id, cached_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        video_url, nutrition, favorite_id, servings, ready_in_minutes,
+        nutrition_coverage, cached_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       input.userId,
       normalizeRecipeId(input.recipeId, input.source),
@@ -122,6 +145,9 @@ export async function upsertFull(input: CachedRecipeInput): Promise<void> {
       input.videoUrl,
       input.nutrition === null ? null : JSON.stringify(input.nutrition),
       input.favoriteId,
+      input.servings,
+      input.readyInMinutes,
+      input.nutritionCoverage,
       new Date().toISOString(),
     ],
   );
@@ -130,6 +156,8 @@ export async function upsertFull(input: CachedRecipeInput): Promise<void> {
 // Quy tắc ghi (2) — UC-08 khi có mạng: chỉ UPDATE dòng đã tồn tại của đúng
 // user_id + recipe_id + source, không tạo cache cho công thức chưa yêu thích.
 // favorite_id dùng COALESCE để không xoá mất giá trị cũ khi người gọi không biết.
+// servings, ready_in_minutes, nutrition_coverage ghi thẳng theo dữ liệu server
+// (kể cả null), vì đây là bản chi tiết mới nhất.
 export async function updateIfExists(
   userId: number,
   recipeId: string,
@@ -141,6 +169,7 @@ export async function updateIfExists(
     `UPDATE ${CACHED_RECIPES_TABLE}
         SET title = ?, image_url = ?, ingredients = ?, steps = ?,
             video_url = ?, nutrition = ?,
+            servings = ?, ready_in_minutes = ?, nutrition_coverage = ?,
             favorite_id = COALESCE(?, favorite_id),
             cached_at = ?
       WHERE user_id = ? AND recipe_id = ? AND source = ?`,
@@ -151,6 +180,9 @@ export async function updateIfExists(
       serializeSteps(patch.steps),
       patch.videoUrl,
       patch.nutrition === null ? null : JSON.stringify(patch.nutrition),
+      patch.servings,
+      patch.readyInMinutes,
+      patch.nutritionCoverage,
       patch.favoriteId ?? null,
       new Date().toISOString(),
       userId,
@@ -162,8 +194,9 @@ export async function updateIfExists(
 }
 
 // Quy tắc ghi (3) — UC-10 khi có mạng: CHỈ title/image của dòng đã tồn tại.
-// Tuyệt đối không đụng tới ingredients, steps, video_url, nutrition, vì danh
-// sách yêu thích không mang những dữ liệu đó và sẽ làm mất chi tiết đã cache.
+// Tuyệt đối không đụng tới ingredients, steps, video_url, nutrition, servings,
+// ready_in_minutes, nutrition_coverage, vì danh sách yêu thích không mang những
+// dữ liệu đó và sẽ làm mất chi tiết đã cache.
 export async function updateTitleImageIfExists(
   userId: number,
   recipeId: string,
