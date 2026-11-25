@@ -24,6 +24,19 @@ export const icons = {
   lock: icon(require('../../assets/icons/ac-lock.svg'), 18, 18),
   info: icon(require('../../assets/icons/ac-info.svg'), 18, 18),
   utensils: icon(require('../../assets/icons/ac-utensils.svg'), 18, 18), // dao nĩa (màn Chào mừng)
+
+  search: icon(require('../../assets/icons/se-search.svg'), 20, 20),
+  searchWhite: icon(require('../../assets/icons/se-search-white.svg'), 19, 19), 
+  searchLarge: icon(require('../../assets/icons/se-search-large.svg'), 34, 34), 
+  filter: icon(require('../../assets/icons/se-filter.svg'), 20, 20),
+  filterGreen: icon(require('../../assets/icons/se-filter-green.svg'), 18, 18), 
+  close: icon(require('../../assets/icons/se-close.svg'), 12, 12), 
+  closeDark: icon(require('../../assets/icons/se-close-dark.svg'), 18, 18),
+  plus: icon(require('../../assets/icons/se-plus.svg'), 12, 12), 
+  heart: icon(require('../../assets/icons/se-heart.svg'), 18, 18), 
+  heartFilled: icon(require('../../assets/icons/se-heart-filled.svg'), 18, 18), 
+  leaf: icon(require('../../assets/icons/se-leaf.svg'), 18, 18), 
+  basket: icon(require('../../assets/icons/se-basket.svg'), 34, 34),
 };
 
 export const images = {
