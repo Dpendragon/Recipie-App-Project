@@ -21,9 +21,6 @@ export const icons = {
   shieldCheck: icon(require('../../assets/icons/ac-shield-check.svg'), 14, 14),
   mailCheck: icon(require('../../assets/icons/ac-mail-check.svg'), 18, 18),
   mailCheckRed: icon(require('../../assets/icons/ac-mail-check-red.svg'), 18, 18),
-  lock: icon(require('../../assets/icons/ac-lock.svg'), 18, 18),
-  info: icon(require('../../assets/icons/ac-info.svg'), 18, 18),
-  utensils: icon(require('../../assets/icons/ac-utensils.svg'), 18, 18), // dao nĩa (màn Chào mừng)
 
   search: icon(require('../../assets/icons/se-search.svg'), 20, 20),
   searchWhite: icon(require('../../assets/icons/se-search-white.svg'), 19, 19), 
