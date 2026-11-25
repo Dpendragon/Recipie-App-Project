@@ -37,6 +37,14 @@ export const icons = {
   cart: icon(require('../../assets/icons/rd-cart.svg'), 19, 19), // thêm vào danh sách mua sắm
   calendar: icon(require('../../assets/icons/rd-calendar.svg'), 19, 19), // thêm vào kế hoạch bữa ăn
   play: icon(require('../../assets/icons/rd-play.svg'), 22, 22), // nút phát video
+
+  // Yêu thích (UC-09 → UC-11)
+  heartCard: icon(require('../../assets/icons/fv-heart-card.svg'), 18, 18), // nút tim trên ảnh thẻ
+  heartEmpty: icon(require('../../assets/icons/fv-heart-empty.svg'), 34, 34), // minh hoạ danh sách rỗng
+  wifiOff: icon(require('../../assets/icons/fv-wifi-off.svg'), 18, 18), // banner đang ngoại tuyến
+  cloudOff: icon(require('../../assets/icons/fv-cloud-off.svg'), 18, 18), // banner cần mạng để dùng thêm
+  toastCheck: icon(require('../../assets/icons/fv-toast-check.svg'), 19, 19), // dấu tick trên toast
+  calendarGreen: icon(require('../../assets/icons/fv-calendar.svg'), 19, 19), // nút phụ "Thêm món vào kế hoạch"
 };
 
 export const images = {

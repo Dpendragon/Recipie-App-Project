@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useRef, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,24 +13,68 @@ import { Image } from 'expo-image';
 import { isAxiosError } from 'axios';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import { ActionButton } from '@/components/common/ActionButton';
+import { EmptyState } from '@/components/common/EmptyState';
 import { Icon } from '@/components/common/Icon';
+import { Notice } from '@/components/common/Notice';
+import { Toast } from '@/components/common/Toast';
 import { icons, type IconAsset } from '@/constants/assets';
 import { fontSize, spacing } from '@/constants/layout';
 import { colors, fonts, radius } from '@/constants/theme';
+import { useCurrentUserId } from '@/hooks/useCurrentUserId';
 import { useNetwork } from '@/hooks/useNetwork';
+import { useToast } from '@/hooks/useToast';
 import { getById } from '@/services/api/recipeApi';
-import type { RecipeDetail, RecipeSource } from '@/types/recipe.types';
+import {
+  getRecipeDetail,
+  OfflineCacheMissError,
+  removeFavorite,
+  saveFavorite,
+  type RecipeDetailResult,
+} from '@/services/cache/cacheManager';
+import type {
+  NutritionCoverage,
+  RecipeAuthor,
+  RecipeIngredient,
+  RecipeNutrition,
+  RecipeRating,
+  RecipeSource,
+} from '@/types/recipe.types';
+import { getApiErrorMessage } from '@/utils/helpers';
 
 // Màn hình chỉ có 5 trạng thái; 'offline' và 'notFound' là hai nhánh ngoại lệ của UC-08.
 type Status = 'loading' | 'ready' | 'notFound' | 'offline' | 'error';
 
-// Kết quả đã xong của một lần gọi API. 'loading' không nằm ở đây: trạng thái tải
+// Kết quả đã xong của một lần tải. 'loading' không nằm ở đây: trạng thái tải
 // được suy ra khi chưa có kết quả nào khớp với request hiện tại.
+// 'ready' giữ nguyên nguồn dữ liệu: mạng (đủ trường) hoặc bản lưu trên máy.
 type Settled =
-  | { kind: 'ready'; recipe: RecipeDetail }
+  | { kind: 'ready'; data: RecipeDetailResult }
   | { kind: 'notFound' }
   | { kind: 'offline' }
   | { kind: 'error'; message: string };
+
+// Trạng thái yêu thích cục bộ, gắn với đúng request đang hiển thị. saved tách
+// khỏi favoriteId vì lúc lưu lạc quan đã hiện "Đã lưu" nhưng chưa có id từ server.
+type FavoriteState = { key: string; saved: boolean; favoriteId: number | null };
+
+// Dữ liệu màn hình cần, dựng được từ cả RecipeDetail lẫn CachedRecipe.
+// Bản lưu trên máy không có tác giả và điểm đánh giá nên hai trường đó null.
+type ViewRecipe = {
+  id: string;
+  source: RecipeSource;
+  title: string;
+  imageUrl: string | null;
+  servings: number | null;
+  readyInMinutes: number | null;
+  ingredients: RecipeIngredient[];
+  steps: string[];
+  videoUrl: string | null;
+  nutrition: RecipeNutrition | null;
+  nutritionCoverage: NutritionCoverage | null;
+  author: RecipeAuthor | null;
+  rating: RecipeRating | null;
+};
 
 const SOURCE_LABEL: Record<RecipeSource, string> = {
   LOCAL: 'Cộng đồng',
@@ -40,6 +84,9 @@ const SOURCE_LABEL: Record<RecipeSource, string> = {
 // Màu vàng của sao đánh giá, chỉ dùng ở màn này nên không thêm vào theme.ts
 // (file dùng chung của nhánh khác).
 const STAR_COLOR = '#C58A35';
+
+const NEED_NETWORK_TO_SAVE = 'Cần kết nối mạng để lưu công thức';
+const NEED_NETWORK_TO_UNSAVE = 'Cần kết nối mạng để bỏ lưu';
 
 // Tính năng chưa nối API: báo cho người dùng thay vì để nút bấm không phản hồi.
 function comingSoon() {
@@ -85,8 +132,15 @@ function toMetric(value: number | null | undefined): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
-// Quy lỗi gọi API về đúng nhánh ngoại lệ của UC-08.
+// Không gọi tới được server (mất mạng, timeout): khác lỗi có response từ server.
+function isNetworkError(error: unknown): boolean {
+  return isAxiosError(error) && !error.response;
+}
+
+// Quy lỗi tải công thức về đúng nhánh ngoại lệ của UC-08.
 function toFailure(error: unknown): Settled {
+  // Mất mạng và công thức chưa từng được lưu yêu thích (2c).
+  if (error instanceof OfflineCacheMissError) return { kind: 'offline' };
   if (isAxiosError(error)) {
     if (error.response?.status === 404) return { kind: 'notFound' };
     // Hết thời gian chờ hoặc không gọi được máy chủ: coi như mất mạng.
@@ -98,9 +152,76 @@ function toFailure(error: unknown): Settled {
   return { kind: 'error', message: 'Không tải được công thức. Vui lòng thử lại.' };
 }
 
+// Có userId thì đi qua cacheManager: có mạng lấy dữ liệu sống và làm mới cache
+// (chỉ dòng đã có), mất mạng đọc bản lưu trên máy. Không đọc được tài khoản thì
+// không được đụng vào cache (cache phân vùng theo user_id), chỉ lấy từ mạng.
+async function loadRecipe(
+  userId: number | null,
+  recipeId: string,
+  source: RecipeSource,
+  isOnline: boolean,
+): Promise<RecipeDetailResult> {
+  if (userId === null) {
+    if (!isOnline) throw new OfflineCacheMissError();
+    return { origin: 'network', recipe: await getById(recipeId, source) };
+  }
+  return getRecipeDetail({ userId, recipeId, source, isOnline });
+}
+
+function toViewRecipe(data: RecipeDetailResult): ViewRecipe {
+  if (data.origin === 'network') {
+    const recipe = data.recipe;
+    return {
+      id: recipe.id,
+      source: recipe.source,
+      title: recipe.title,
+      imageUrl: recipe.imageUrl,
+      servings: recipe.servings,
+      readyInMinutes: recipe.readyInMinutes,
+      ingredients: recipe.ingredients,
+      steps: recipe.steps,
+      videoUrl: recipe.videoUrl,
+      nutrition: recipe.nutrition,
+      nutritionCoverage: recipe.nutritionCoverage,
+      author: recipe.author ?? null,
+      rating: recipe.rating ?? null,
+    };
+  }
+
+  const cached = data.recipe;
+  return {
+    id: cached.recipeId,
+    source: cached.source,
+    title: cached.title ?? 'Công thức đã lưu',
+    imageUrl: cached.imageUrl,
+    servings: cached.servings,
+    readyInMinutes: cached.readyInMinutes,
+    ingredients: cached.ingredients,
+    steps: cached.steps,
+    videoUrl: cached.videoUrl,
+    nutrition: cached.nutrition,
+    nutritionCoverage: cached.nutritionCoverage,
+    author: null,
+    rating: null,
+  };
+}
+
+// Trạng thái yêu thích ban đầu theo dữ liệu vừa tải. Bản lưu trên máy chỉ tồn
+// tại cho công thức đã yêu thích, nên luôn là "đã lưu" kể cả khi thiếu favorite_id
+// (dòng do bản app cũ ghi).
+function initialFavorite(key: string, data: RecipeDetailResult): FavoriteState {
+  if (data.origin === 'cache') {
+    return { key, saved: true, favoriteId: data.recipe.favoriteId };
+  }
+  const favoriteId = data.recipe.favoriteId ?? null;
+  return { key, saved: favoriteId !== null, favoriteId };
+}
+
 export default function RecipeDetailScreen() {
   const router = useRouter();
   const { isOnline } = useNetwork();
+  const userId = useCurrentUserId();
+  const { toast, showToast } = useToast();
   const {
     id,
     source: sourceParam,
@@ -109,28 +230,42 @@ export default function RecipeDetailScreen() {
   const source = toSource(sourceParam);
   const matchedIds = toMatchedIds(matchedIdsParam);
 
-  // Số lần bấm "Thử lại": đổi requestKey để effect gọi lại API.
+  // Số lần bấm "Thử lại": đổi requestKey để effect tải lại.
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; state: Settled } | null>(null);
+  const [favoriteOverride, setFavoriteOverride] = useState<FavoriteState | null>(null);
+  // Chặn bấm tim liên tiếp khi yêu cầu trước chưa xong.
+  const favoritePendingRef = useRef(false);
 
-  const requestKey = `${id ?? ''}|${source}|${attempt}`;
+  // Đổi mạng cũng tải lại: mất mạng thì chuyển sang bản lưu trên máy (UC-08 2a),
+  // có mạng lại thì lấy dữ liệu mới nhất và làm mới bản lưu đó.
+  const requestKey = `${id ?? ''}|${source}|${attempt}|${isOnline ? 'online' : 'offline'}|${userId ?? ''}`;
   // Kết quả cũ của request khác (đổi id, đổi nguồn, bấm thử lại) không được dùng,
   // nhờ vậy không cần setState trong effect để quay về trạng thái đang tải.
   const settled = result?.key === requestKey ? result.state : null;
 
-  // UC-08 2c: mất mạng và công thức chưa từng được lưu yêu thích.
-  // Bản lưu ngoại tuyến sẽ được đọc ở bước làm Yêu thích, hiện chỉ báo cần mạng.
-  const status: Status = !id ? 'notFound' : !isOnline ? 'offline' : (settled?.kind ?? 'loading');
-  const recipe = settled?.kind === 'ready' ? settled.recipe : null;
+  // userId undefined: đang đọc token, chưa biết dùng vùng cache nào.
+  const status: Status = !id
+    ? 'notFound'
+    : userId === undefined
+      ? 'loading'
+      : (settled?.kind ?? 'loading');
+  const data = settled?.kind === 'ready' ? settled.data : null;
   const errorMessage = settled?.kind === 'error' ? settled.message : null;
 
+  const favorite: FavoriteState | null = data
+    ? favoriteOverride?.key === requestKey
+      ? favoriteOverride
+      : initialFavorite(requestKey, data)
+    : null;
+
   useEffect(() => {
-    if (!id || !isOnline) return;
+    if (!id || userId === undefined) return;
 
     let cancelled = false;
-    void getById(id, source)
-      .then((data) => {
-        if (!cancelled) setResult({ key: requestKey, state: { kind: 'ready', recipe: data } });
+    void loadRecipe(userId, id, source, isOnline)
+      .then((loaded) => {
+        if (!cancelled) setResult({ key: requestKey, state: { kind: 'ready', data: loaded } });
       })
       .catch((error: unknown) => {
         if (!cancelled) setResult({ key: requestKey, state: toFailure(error) });
@@ -139,9 +274,64 @@ export default function RecipeDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, isOnline, requestKey, source]);
+  }, [id, isOnline, requestKey, source, userId]);
 
   const retry = () => setAttempt((value) => value + 1);
+
+  // UC-09 / UC-11: cập nhật lạc quan, hoàn tác và báo toast khi lỗi.
+  // Cache được ghi/xoá bên trong cacheManager, chỉ sau khi server đã nhận.
+  const toggleFavorite = async () => {
+    if (!data || !favorite || favoritePendingRef.current) return;
+    const key = requestKey;
+    const previous = favorite;
+
+    if (typeof userId !== 'number') {
+      showToast('Không xác định được tài khoản. Vui lòng đăng nhập lại.', 'error');
+      return;
+    }
+
+    if (previous.saved) {
+      // Bản lưu do app cũ ghi không có favorite_id: không biết gọi DELETE dòng nào.
+      if (previous.favoriteId === null) {
+        showToast(NEED_NETWORK_TO_UNSAVE, 'error');
+        return;
+      }
+      const favoriteId = previous.favoriteId;
+      const view = toViewRecipe(data);
+
+      favoritePendingRef.current = true;
+      setFavoriteOverride({ key, saved: false, favoriteId: null });
+      try {
+        await removeFavorite({ userId, favoriteId, recipeId: view.id, source: view.source });
+        showToast('Đã bỏ lưu khỏi yêu thích');
+      } catch (error) {
+        setFavoriteOverride(previous);
+        showToast(isNetworkError(error) ? NEED_NETWORK_TO_UNSAVE : getApiErrorMessage(error), 'error');
+      } finally {
+        favoritePendingRef.current = false;
+      }
+      return;
+    }
+
+    // Lưu cần RecipeDetail đầy đủ từ server để ghi cache, bản lưu trên máy không đủ.
+    if (data.origin !== 'network') {
+      showToast(NEED_NETWORK_TO_SAVE, 'error');
+      return;
+    }
+
+    favoritePendingRef.current = true;
+    setFavoriteOverride({ key, saved: true, favoriteId: null });
+    try {
+      const saved = await saveFavorite({ userId, recipe: data.recipe });
+      setFavoriteOverride({ key, saved: true, favoriteId: saved.id });
+      showToast('Đã lưu vào yêu thích');
+    } catch (error) {
+      setFavoriteOverride(previous);
+      showToast(isNetworkError(error) ? NEED_NETWORK_TO_SAVE : getApiErrorMessage(error), 'error');
+    } finally {
+      favoritePendingRef.current = false;
+    }
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
@@ -198,87 +388,45 @@ export default function RecipeDetailScreen() {
         />
       ) : null}
 
-      {status === 'ready' && recipe ? (
-        <RecipeBody recipe={recipe} matchedIds={matchedIds} />
+      {status === 'ready' && data && favorite ? (
+        <RecipeBody
+          recipe={toViewRecipe(data)}
+          isCached={data.origin === 'cache'}
+          matchedIds={matchedIds}
+          isSaved={favorite.saved}
+          // Đã lưu mà thiếu favorite_id (bản lưu cũ khi ngoại tuyến): tắt bỏ lưu.
+          unsaveBlocked={favorite.saved && favorite.favoriteId === null}
+          onToggleFavorite={() => void toggleFavorite()}
+        />
       ) : null}
+
+      <Toast toast={toast} />
     </SafeAreaView>
   );
 }
 
-type ActionButtonProps = {
-  title: string;
-  onPress: () => void;
-  variant?: 'primary' | 'secondary';
-  icon?: IconAsset;
-};
-
-// Thành phần "Nút hành động" của Figma: cao 52, bo tròn, chữ 14, gap 9.
-// Không dùng components/common/Button vì nút đó đang dùng chữ 15 và chỉ có biến
-// thể viền trắng, còn frame này cần cả biến thể nền xanh nhạt.
-function ActionButton({ title, onPress, variant = 'primary', icon }: ActionButtonProps) {
-  const isPrimary = variant === 'primary';
-
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      style={({ pressed }) => [
-        styles.actionButton,
-        isPrimary ? styles.actionPrimary : styles.actionSecondary,
-        pressed ? styles.pressed : null,
-      ]}
-    >
-      {icon ? <Icon icon={icon} /> : null}
-      <Text
-        style={[styles.actionText, isPrimary ? styles.actionTextPrimary : styles.actionTextSecondary]}
-      >
-        {title}
-      </Text>
-    </Pressable>
-  );
-}
-
-type EmptyStateProps = {
-  icon: IconAsset;
-  title: string;
-  message: string;
-  actionTitle: string;
-  onAction: () => void;
-  onBack?: () => void;
-};
-
-// Khung chung cho hai nhánh ngoại lệ của UC-08 (frame 2003:9313 và 2003:9341).
-function EmptyState({ icon, title, message, actionTitle, onAction, onBack }: EmptyStateProps) {
-  return (
-    <View style={styles.emptyState}>
-      <View style={styles.emptyIcon}>
-        <Icon icon={icon} />
-      </View>
-      <Text style={styles.emptyTitle}>{title}</Text>
-      <Text style={styles.emptyMessage}>{message}</Text>
-      <View style={styles.emptyAction}>
-        <ActionButton title={actionTitle} onPress={onAction} />
-      </View>
-      {onBack ? (
-        <Pressable onPress={onBack} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.emptyBack}>Quay lại</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
 type RecipeBodyProps = {
-  recipe: RecipeDetail;
+  recipe: ViewRecipe;
+  // Đang xem bản lưu trên máy (mất mạng): hiện banner, làm mờ các nút cần mạng.
+  isCached: boolean;
   // null khi màn hình không được mở từ luồng tìm kiếm theo nguyên liệu.
   matchedIds: Set<string> | null;
+  isSaved: boolean;
+  unsaveBlocked: boolean;
+  onToggleFavorite: () => void;
 };
 
-function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
+function RecipeBody({
+  recipe,
+  isCached,
+  matchedIds,
+  isSaved,
+  unsaveBlocked,
+  onToggleFavorite,
+}: RecipeBodyProps) {
   const authorName = recipe.author?.name?.trim();
   const rating = recipe.rating;
-  // favoriteId chỉ có khi backend B2 đã trả; có giá trị nghĩa là đã lưu.
-  const isSaved = typeof recipe.favoriteId === 'number';
+  const servingsLabel = recipe.servings !== null ? `${recipe.servings} người` : null;
 
   const calories = toMetric(recipe.nutrition?.calories);
   const protein = toMetric(recipe.nutrition?.protein);
@@ -310,6 +458,9 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
+      {/* Frame 2041:25924: đang xem bản lưu ngoại tuyến của công thức yêu thích. */}
+      {isCached ? <Notice variant="success" message="Bạn đang xem bản đã lưu trên máy" /> : null}
+
       {recipe.imageUrl ? (
         <Image source={{ uri: recipe.imageUrl }} style={styles.hero} contentFit="cover" />
       ) : (
@@ -321,16 +472,18 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
           <View style={styles.sourceChip}>
             <Text style={styles.sourceChipText}>{SOURCE_LABEL[recipe.source]}</Text>
           </View>
-          {/* TODO(B5 – Yêu thích): nối API lưu/bỏ lưu yêu thích, bỏ comingSoon(). */}
+          {/* UC-09 / UC-11: lưu và bỏ lưu yêu thích. Khi bị chặn (thiếu favorite_id)
+              vẫn cho bấm để toast giải thích lý do. */}
           <Pressable
-            onPress={comingSoon}
+            onPress={onToggleFavorite}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityState={{ selected: isSaved }}
+            accessibilityState={{ selected: isSaved, disabled: unsaveBlocked }}
             accessibilityLabel={isSaved ? 'Bỏ lưu công thức' : 'Lưu công thức vào yêu thích'}
-            style={styles.favorite}
+            accessibilityHint={unsaveBlocked ? NEED_NETWORK_TO_UNSAVE : undefined}
+            style={[styles.favorite, unsaveBlocked ? styles.favoriteBlocked : null]}
           >
-            <Icon icon={icons.heart} />
+            <Icon icon={icons.heart} style={isSaved ? styles.heartSaved : null} />
             <Text style={styles.favoriteText}>{isSaved ? 'Đã lưu' : 'Yêu thích'}</Text>
           </Pressable>
         </View>
@@ -356,7 +509,7 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
         {recipe.readyInMinutes !== null ? (
           <QuickInfoItem icon={icons.clock} label={`${recipe.readyInMinutes} phút`} />
         ) : null}
-        <QuickInfoItem icon={icons.users} label={`${recipe.servings} người`} />
+        {servingsLabel ? <QuickInfoItem icon={icons.users} label={servingsLabel} /> : null}
         {hasNutrition && calories !== null ? (
           <QuickInfoItem
             icon={icons.flame}
@@ -370,7 +523,7 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
           <Text style={styles.sectionTitle}>Nguyên liệu</Text>
 
           <View style={styles.servingRow}>
-            <Text style={styles.servingText}>{`${recipe.servings} người`}</Text>
+            <Text style={styles.servingText}>{servingsLabel ?? ''}</Text>
             {/* Mức phù hợp là thông tin của luồng tìm theo nguyên liệu, chỉ hiện khi có matchedIds. */}
             {matchedIds ? (
               <Text
@@ -402,7 +555,9 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
             title="Thêm tất cả nguyên liệu vào mua sắm"
             icon={icons.cart}
             onPress={comingSoon}
+            disabled={isCached}
           />
+          {isCached ? <Text style={styles.needNetwork}>Cần kết nối mạng</Text> : null}
           <Text
             style={styles.sectionNote}
           >{`Thêm nguyên nhóm ${total} nguyên liệu. Mỗi dòng được giữ riêng, không gộp với nguyên liệu đã có trong danh sách.`}</Text>
@@ -429,7 +584,11 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
           <Text style={styles.nutritionTitle}>Dinh dưỡng ước tính</Text>
           <Text
             style={styles.nutritionSubtitle}
-          >{`Trên mỗi khẩu phần · ${recipe.servings} khẩu phần / công thức`}</Text>
+          >
+            {recipe.servings !== null
+              ? `Trên mỗi khẩu phần · ${recipe.servings} khẩu phần / công thức`
+              : 'Trên mỗi khẩu phần'}
+          </Text>
           <View style={styles.nutritionRow}>
             {calories !== null ? (
               <NutritionMetric value={`${formatNumber(calories)}`} label="kcal" />
@@ -505,7 +664,15 @@ function RecipeBody({ recipe, matchedIds }: RecipeBodyProps) {
         )}
 
         {/* TODO(B6 – Đánh giá): nối API gửi đánh giá, bỏ comingSoon(). */}
-        <ActionButton title="Viết đánh giá" variant="secondary" onPress={comingSoon} />
+        <View style={styles.networkAction}>
+          <ActionButton
+            title="Viết đánh giá"
+            variant="secondary"
+            onPress={comingSoon}
+            disabled={isCached}
+          />
+          {isCached ? <Text style={styles.needNetwork}>Cần kết nối mạng</Text> : null}
+        </View>
       </View>
 
       {/* TODO(Kế hoạch bữa ăn): nối API thêm công thức vào kế hoạch, bỏ comingSoon(). */}
@@ -559,58 +726,14 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   loadingText: { fontFamily: fonts.regular, fontSize: fontSize.xs, color: colors.textMid },
 
-  pressed: { opacity: 0.85 },
-
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 9,
-    height: 52,
-    paddingHorizontal: spacing.lg,
-    borderRadius: radius.pill,
-  },
-  actionPrimary: { backgroundColor: colors.primary },
-  actionSecondary: { backgroundColor: colors.softGreen },
-  actionText: { fontFamily: fonts.semiBold, fontSize: fontSize.sm },
-  actionTextPrimary: { color: colors.white },
-  actionTextSecondary: { color: colors.primary },
-
-  emptyState: {
-    alignItems: 'center',
-    gap: 20,
-    paddingHorizontal: 22,
-    paddingTop: 64,
-    paddingBottom: 28,
-  },
-  emptyIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.softGreen,
-  },
-  emptyTitle: {
-    fontFamily: fonts.semiBold,
-    fontSize: fontSize.lg,
-    lineHeight: 30,
-    textAlign: 'center',
-    color: colors.textDark,
-  },
-  emptyMessage: {
+  // Nút cần mạng khi xem bản lưu (frame 2041:25924): nút mờ 40%, chú thích ngay dưới.
+  networkAction: { gap: 7 },
+  needNetwork: {
     fontFamily: fonts.regular,
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 11,
+    lineHeight: 17,
     textAlign: 'center',
     color: colors.textMid,
-  },
-  emptyAction: { width: '100%' },
-  emptyBack: {
-    fontFamily: fonts.semiBold,
-    fontSize: fontSize.xs,
-    lineHeight: 18,
-    color: colors.primary,
   },
 
   scroll: { paddingHorizontal: 22, paddingBottom: 70, gap: 22 },
@@ -630,6 +753,8 @@ const styles = StyleSheet.create({
   },
   sourceChipText: { fontFamily: fonts.semiBold, fontSize: fontSize.xs, color: colors.primary },
   favorite: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  favoriteBlocked: { opacity: 0.4 },
+  heartSaved: { tintColor: colors.primary },
   favoriteText: { fontFamily: fonts.semiBold, fontSize: fontSize.xs, color: colors.primary },
   title: {
     fontFamily: fonts.bold,

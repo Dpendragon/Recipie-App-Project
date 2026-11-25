@@ -18,3 +18,11 @@ export const fontSize = {
   xl: 24, // tiêu đề màn hình
   xxl: 32, // tiêu đề lớn, số liệu nổi bật
 } as const;
+
+// Màu bổ sung theo Figma cho các trạng thái không có trong theme.ts (file dùng
+// chung của nhánh khác nên không sửa): banner cảnh báo ngoại tuyến và khung xương tải.
+export const extraColors = {
+  warningBg: '#F5EBD8', // nền banner "Bạn đang ngoại tuyến"
+  warningText: '#866333', // chữ và icon banner cảnh báo
+  skeletonSoft: '#F0F1E9', // thanh xương nhạt (dòng phụ)
+} as const;
