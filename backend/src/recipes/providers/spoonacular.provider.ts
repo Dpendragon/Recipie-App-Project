@@ -56,10 +56,9 @@ interface SpoonacularInformation {
   nutrition?: unknown;
 }
 
-function toStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
-  const items = value.filter((item): item is string => typeof item === 'string');
-  return items.length > 0 ? items : null;
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is string => typeof item === 'string');
 }
 
 // Ưu tiên các bước đã tách sẵn; không có thì tách đoạn hướng dẫn (có thể là HTML).
@@ -157,7 +156,7 @@ function toParsedNutrition(item: unknown): ParsedNutrition | null {
 export class SpoonacularProvider implements RecipeProvider {
   private readonly logger = new Logger(SpoonacularProvider.name);
 
-  constructor(private readonly config: ConfigService) {}
+  constructor(private readonly config: ConfigService) { }
 
   async search(params: SearchParams): Promise<RankedRecipe[]> {
     const apiKey = this.config.get<string>('SPOONACULAR_API_KEY');
@@ -171,7 +170,7 @@ export class SpoonacularProvider implements RecipeProvider {
     const url = new URL(BASE_URL);
     const query = url.searchParams;
     query.set('number', String(SPOONACULAR_RESULT_COUNT));
-    query.set('addRecipeInformation', 'true'); 
+    query.set('addRecipeInformation', 'true');
     query.set('fillIngredients', 'true');
     if (params.name) query.set('query', params.name);
     if (hasIngredients) {

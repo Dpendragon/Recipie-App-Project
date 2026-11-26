@@ -58,12 +58,13 @@ function toAuthor(
   };
 }
 
-// JSON trong DB có thể là bất cứ thứ gì: chỉ nhận mảng chuỗi, còn lại trả null.
-function toStringArray(value: unknown): string[] | null {
-  if (!Array.isArray(value)) return null;
+// JSON trong DB có thể là bất cứ thứ gì (kể cả NULL): chỉ nhận mảng chuỗi,
+// còn lại trả mảng rỗng để client luôn đọc được diets/dishTypes như một mảng.
+function toStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
   return value.every((item) => typeof item === 'string')
     ? (value as string[])
-    : null;
+    : [];
 }
 
 // recipes.id là Int nhưng tham số vào là chuỗi (route dùng chung với Spoonacular).
