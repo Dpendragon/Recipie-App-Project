@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { SpoonacularProvider } from '../recipes/spoonacular.provider';
+import { SpoonacularProvider } from '../recipes/providers/spoonacular.provider';
 import { Prisma } from '../generated/prisma/client';
 import { NutritionCoverage } from '../generated/prisma/enums';
 

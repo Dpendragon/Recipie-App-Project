@@ -10,6 +10,8 @@ import { NutritionModule } from './nutrition/nutrition.module';
 import { ReviewsModule } from './reviews/reviews.module';
 import { FavoritesModule } from './favorites/favorites.module';
 import { MediaModule } from './media/media.module';
+import { ShoppingItemsModule } from './shopping-items/shopping-items.module';
+import { MealPlanModule } from './meal-plan/meal-plan.module';
 
 @Module({
   imports: [
@@ -22,6 +24,8 @@ import { MediaModule } from './media/media.module';
     ReviewsModule,
     FavoritesModule,
     MediaModule,
+    ShoppingItemsModule,
+    MealPlanModule,
   ],
   controllers: [AppController],
   providers: [AppService],

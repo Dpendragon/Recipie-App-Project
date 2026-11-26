@@ -11,6 +11,8 @@ type Props = {
   message: string;
   actionTitle: string;
   onAction: () => void;
+  // Nút phụ nền xanh nhạt dưới nút chính (màn tìm kiếm: "Xóa bộ lọc").
+  secondaryAction?: { title: string; onPress: () => void };
   // Liên kết "Quay lại" dưới nút (màn chi tiết công thức).
   onBack?: () => void;
   // Dòng chú thích cuối khung (màn Yêu thích rỗng).
@@ -26,6 +28,7 @@ export function EmptyState({
   message,
   actionTitle,
   onAction,
+  secondaryAction,
   onBack,
   footnote,
   style,
@@ -39,6 +42,13 @@ export function EmptyState({
       <Text style={styles.message}>{message}</Text>
       <View style={styles.action}>
         <ActionButton title={actionTitle} onPress={onAction} />
+        {secondaryAction ? (
+          <ActionButton
+            title={secondaryAction.title}
+            variant="secondary"
+            onPress={secondaryAction.onPress}
+          />
+        ) : null}
       </View>
       {onBack ? (
         <Pressable onPress={onBack} hitSlop={8} accessibilityRole="button">
@@ -80,7 +90,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: colors.textMid,
   },
-  action: { width: '100%' },
+  action: { width: '100%', gap: 12 },
   back: {
     fontFamily: fonts.semiBold,
     fontSize: fontSize.xs,

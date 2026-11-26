@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { SpoonacularProvider } from '../recipes/spoonacular.provider';
+import { SpoonacularProvider } from '../recipes/providers/spoonacular.provider';
 import { NutritionService } from './nutrition.service';
 
 // PrismaModule là @Global nên không cần import ở đây.

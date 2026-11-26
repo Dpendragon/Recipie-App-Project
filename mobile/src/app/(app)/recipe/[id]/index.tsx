@@ -570,7 +570,7 @@ function RecipeBody({
             accessibilityHint={unsaveBlocked ? NEED_NETWORK_TO_UNSAVE : undefined}
             style={[styles.favorite, unsaveBlocked ? styles.favoriteBlocked : null]}
           >
-            <Icon icon={icons.heart} style={isSaved ? styles.heartSaved : null} />
+            <Icon icon={icons.detailHeart} style={isSaved ? styles.heartSaved : null} />
             <Text style={styles.favoriteText}>{isSaved ? 'Đã lưu' : 'Yêu thích'}</Text>
           </Pressable>
         </View>
@@ -623,7 +623,7 @@ function RecipeBody({
             {recipe.ingredients.map((item) => (
               <View key={item.id} style={styles.ingredientRow}>
                 {matchedIds ? (
-                  <Icon icon={matchedIds.has(String(item.id)) ? icons.circleCheck : icons.circlePlus} />
+                  <Icon icon={matchedIds.has(String(item.id)) ? icons.ingredientCheck : icons.circlePlus} />
                 ) : null}
                 <Text style={styles.ingredientName}>{item.nameVi}</Text>
                 <Text style={styles.ingredientAmount}>

@@ -10,3 +10,12 @@ export interface IngredientSuggestion {
   // Đơn vị thường dùng, gợi ý sẵn cho ô "đơn vị"; null khi danh mục chưa có.
   commonUnit: string | null;
 }
+
+// Một nguyên liệu người dùng đã chọn để tìm công thức.
+export interface SelectedIngredient {
+  nameVi: string;
+  nameEn: string;
+}
+
+// Một dòng gợi ý dùng ở màn tìm kiếm: cùng response với IngredientSuggestion.
+export type Ingredient = IngredientSuggestion;

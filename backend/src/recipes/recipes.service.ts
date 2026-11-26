@@ -12,11 +12,11 @@ import { isLocalId, normalizeRecipeId } from '../common/utils/recipe-id';
 import { ReviewsService } from '../reviews/reviews.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import type { NutritionResult } from '../nutrition/nutrition.service';
-import { LocalDbProvider, toRecipeDetail } from './local-db.provider';
+import { LocalDbProvider, toRecipeDetail } from './providers/local-db.provider';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import type { CreateRecipeIngredientDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
-import type { RecipeDetailResponse } from './recipe-provider.interface';
+import type { RecipeDetailResponse } from './providers/recipe-provider.interface';
 
 export type PageMeta = { nextCursor: number | null; hasMore: boolean };
 

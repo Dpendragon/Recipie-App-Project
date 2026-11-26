@@ -6,7 +6,7 @@ import { Icon } from './Icon';
 type Props = {
   title: string;
   onPress: () => void;
-  variant?: 'primary' | 'outline'; 
+  variant?: 'primary' | 'outline' | 'soft'; 
   loading?: boolean; 
   disabled?: boolean;
   leftIcon?: IconAsset; 
@@ -21,6 +21,8 @@ export function Button({
   leftIcon,
 }: Props) {
   const isPrimary = variant === 'primary';
+  const variantStyle =
+    variant === 'primary' ? styles.primary : variant === 'outline' ? styles.outline : styles.soft;
   const inactive = disabled || loading;
 
   return (
@@ -30,7 +32,7 @@ export function Button({
       accessibilityRole="button"
       style={({ pressed }) => [
         styles.button,
-        isPrimary ? styles.primary : styles.outline,
+        variantStyle,
         inactive ? styles.inactive : null,
         pressed ? styles.pressed : null,
       ]}
@@ -60,6 +62,7 @@ const styles = StyleSheet.create({
   },
   primary: { backgroundColor: colors.primary },
   outline: { backgroundColor: colors.white, borderWidth: 1.5, borderColor: colors.primary },
+  soft: { backgroundColor: colors.softGreen },
   inactive: { opacity: 0.6 },
   pressed: { opacity: 0.85 },
   text: { fontFamily: fonts.semiBold, fontSize: 15, lineHeight: 20 },

@@ -2,7 +2,9 @@ import type {
   CreateRecipeRequest,
   MyRecipeListResponse,
   RecipeDetail,
+  RecipeListResponse,
   RecipeSource,
+  SearchRecipesParams,
   UpdateRecipeRequest,
 } from '@/types/recipe.types';
 import { apiClient } from './apiClient';
@@ -12,6 +14,26 @@ import { apiClient } from './apiClient';
 export async function getById(id: string, source: RecipeSource): Promise<RecipeDetail> {
   const { data } = await apiClient.get<RecipeDetail>(`/recipes/${encodeURIComponent(id)}`, {
     params: { source },
+  });
+  return data;
+}
+
+// GET /recipes/search — tìm theo tên và/hoặc nguyên liệu, kèm bộ lọc.
+export async function searchRecipes(
+  params: SearchRecipesParams,
+  signal?: AbortSignal,
+): Promise<RecipeListResponse> {
+  const { data } = await apiClient.get<RecipeListResponse>('/recipes/search', {
+    params: {
+      name: params.name,
+      ingredients: params.ingredients?.length ? params.ingredients.join(',') : undefined,
+      diet: params.diet,
+      maxReadyTime: params.maxReadyTime,
+      type: params.type,
+      limit: params.limit,
+      cursor: params.cursor,
+    },
+    signal,
   });
   return data;
 }
@@ -46,4 +68,13 @@ export async function update(id: number, body: UpdateRecipeRequest): Promise<Rec
 // DELETE /recipes/:id (UC-20). Server trả 204 không kèm body.
 export async function remove(id: number): Promise<void> {
   await apiClient.delete(`/recipes/${id}`);
+}
+
+// GET /recipes/popular — món cộng đồng nổi tiếng cho Trang chủ.
+export async function getPopularRecipes(limit = 5, signal?: AbortSignal): Promise<RecipeListResponse> {
+  const { data } = await apiClient.get<RecipeListResponse>('/recipes/popular', {
+    params: { limit },
+    signal,
+  });
+  return data;
 }

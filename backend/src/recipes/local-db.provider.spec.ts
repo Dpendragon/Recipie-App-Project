@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { PrismaService } from '../prisma/prisma.service';
-import { LocalDbProvider, splitSteps } from './local-db.provider';
+import { LocalDbProvider, splitSteps } from './providers/local-db.provider';
 
 const prismaMock = {
   recipe: { findUnique: jest.fn() },

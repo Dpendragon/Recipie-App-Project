@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
 import type { IconAsset } from '@/constants/assets';
 import { extraColors, spacing } from '@/constants/layout';
 import { colors, fonts, radius } from '@/constants/theme';
@@ -10,6 +10,8 @@ type Props = {
   // 'danger': kiểu "Xóa" của thành phần Nút (nút "Xóa đánh giá", frame 2020:1028).
   variant?: 'primary' | 'secondary' | 'danger';
   icon?: IconAsset;
+  // Đang gửi request: hiện vòng quay thay cho chữ và chặn bấm lại.
+  loading?: boolean;
   // Nút cần mạng khi đang xem bản lưu ngoại tuyến: mờ 40% như frame 2041:25924.
   disabled?: boolean;
 };
@@ -17,30 +19,42 @@ type Props = {
 // Thành phần "Nút hành động" của Figma (2014:784): cao 52, bo tròn, chữ 14, gap 9.
 // Không dùng components/common/Button vì nút đó đang dùng chữ 15 và chỉ có biến
 // thể viền trắng, còn các màn công thức cần cả biến thể nền xanh nhạt.
-export function ActionButton({ title, onPress, variant = 'primary', icon, disabled = false }: Props) {
+export function ActionButton({
+  title,
+  onPress,
+  variant = 'primary',
+  icon,
+  loading = false,
+  disabled = false,
+}: Props) {
   const isPrimary = variant === 'primary';
+  const inactive = disabled || loading;
+  const textColor = isPrimary
+    ? styles.textPrimary
+    : variant === 'danger'
+      ? styles.textDanger
+      : styles.textSecondary;
 
   return (
     <Pressable
       onPress={onPress}
-      disabled={disabled}
+      disabled={inactive}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: inactive, busy: loading }}
       style={({ pressed }) => [
         styles.button,
         isPrimary ? styles.primary : variant === 'danger' ? styles.danger : styles.secondary,
         disabled ? styles.disabled : pressed ? styles.pressed : null,
       ]}
     >
-      {icon ? <Icon icon={icon} /> : null}
-      <Text
-        style={[
-          styles.text,
-          isPrimary ? styles.textPrimary : variant === 'danger' ? styles.textDanger : styles.textSecondary,
-        ]}
-      >
-        {title}
-      </Text>
+      {loading ? (
+        <ActivityIndicator color={isPrimary ? colors.white : colors.primary} />
+      ) : (
+        <>
+          {icon ? <Icon icon={icon} /> : null}
+          <Text style={[styles.text, textColor]}>{title}</Text>
+        </>
+      )}
     </Pressable>
   );
 }

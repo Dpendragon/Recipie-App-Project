@@ -11,11 +11,11 @@ import { PrismaService } from '../prisma/prisma.service';
 import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
 import { ReviewsService } from '../reviews/reviews.service';
 import { NutritionService } from '../nutrition/nutrition.service';
-import { LocalDbProvider } from './local-db.provider';
+import { LocalDbProvider } from './providers/local-db.provider';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
-import type { RecipeDetail } from './recipe-provider.interface';
+import type { RecipeDetail } from './providers/recipe-provider.interface';
 
 const detail = {
   id: '1',
