@@ -16,7 +16,6 @@ import { hasActiveFilters } from '@/constants/searchFilters';
 import { colors, fonts, radius } from '@/constants/theme';
 import { useRecipeSearch } from '@/hooks/useRecipeSearch';
 import { useSearch } from '@/hooks/useSearch';
-import { showComingSoon } from '@/utils/helpers';
 
 // Màn tìm kiếm gộp: tìm theo tên món và/hoặc nguyên liệu, kèm bộ lọc, trong cùng một màn hình.
 export default function SearchScreen() {
@@ -92,7 +91,12 @@ export default function SearchScreen() {
           <RecipeCard
             recipe={item}
             variant="compact"
-            onPress={() => showComingSoon('Xem chi tiết công thức')}
+            onPress={() =>
+              router.push({
+                pathname: '/recipe/[id]',
+                params: { id: item.id, source: item.source },
+              })
+            }
           />
         )}
         ItemSeparatorComponent={Separator}

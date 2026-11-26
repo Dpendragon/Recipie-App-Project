@@ -147,8 +147,9 @@ function toFailure(error: unknown): Settled {
     if (error.response?.status === 404) return { kind: 'notFound' };
     // Hết thời gian chờ hoặc không gọi được máy chủ: coi như mất mạng.
     if (!error.response) return { kind: 'offline' };
-    if (error.response.status === 501) {
-      return { kind: 'error', message: 'Chưa hỗ trợ nguồn Spoonacular' };
+    // Spoonacular hết lượt gọi hoặc tạm lỗi: server trả 503 kèm lời nhắn.
+    if (error.response.status === 503) {
+      return { kind: 'error', message: getApiErrorMessage(error) };
     }
   }
   return { kind: 'error', message: 'Không tải được công thức. Vui lòng thử lại.' };
