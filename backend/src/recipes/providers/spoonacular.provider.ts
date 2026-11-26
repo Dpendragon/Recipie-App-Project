@@ -1,14 +1,26 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { NutritionCoverage, RecipeSource } from '../../generated/prisma/enums';
 import { SPOONACULAR_RESULT_COUNT } from '../recipes.constants';
 import {
   RankedRecipe,
+  RecipeDetail,
+  RecipeIngredientDetail,
   RecipeProvider,
   SearchParams,
 } from './recipe-provider.interface';
 
 const BASE_URL = 'https://api.spoonacular.com/recipes/complexSearch';
+const INFORMATION_URL = 'https://api.spoonacular.com/recipes';
 const TIMEOUT_MS = 5000;
+const NOT_FOUND_MESSAGE = 'Không tìm thấy công thức';
+const UNAVAILABLE_MESSAGE =
+  'Nguồn công thức mở rộng tạm thời không khả dụng, vui lòng thử lại sau';
 const PARSE_INGREDIENTS_ENDPOINT =
   'https://api.spoonacular.com/recipes/parseIngredients';
 
@@ -20,6 +32,65 @@ interface SpoonacularRecipe {
   servings?: number;
   usedIngredients?: unknown[];
   missedIngredients?: unknown[];
+}
+
+// Các trường dùng tới của GET /recipes/{id}/information.
+interface SpoonacularInformation {
+  id: number;
+  title?: string;
+  image?: string;
+  servings?: number;
+  readyInMinutes?: number;
+  diets?: unknown;
+  dishTypes?: unknown;
+  instructions?: string | null;
+  analyzedInstructions?: { steps?: { step?: unknown }[] }[];
+  extendedIngredients?: {
+    id?: number;
+    name?: string;
+    nameClean?: string | null;
+    original?: string;
+    amount?: number;
+    unit?: string;
+  }[];
+  nutrition?: unknown;
+}
+
+function toStringArray(value: unknown): string[] | null {
+  if (!Array.isArray(value)) return null;
+  const items = value.filter((item): item is string => typeof item === 'string');
+  return items.length > 0 ? items : null;
+}
+
+// Ưu tiên các bước đã tách sẵn; không có thì tách đoạn hướng dẫn (có thể là HTML).
+function toSteps(info: SpoonacularInformation): string[] {
+  const analyzed = (info.analyzedInstructions ?? [])
+    .flatMap((block) => block.steps ?? [])
+    .map((s) => (typeof s.step === 'string' ? s.step.trim() : ''))
+    .filter(Boolean);
+  if (analyzed.length > 0) return analyzed;
+
+  return (info.instructions ?? '')
+    .replace(/<\/(li|p)>|<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function toIngredients(info: SpoonacularInformation): RecipeIngredientDetail[] {
+  return (info.extendedIngredients ?? []).map((item, index) => {
+    const name = item.name?.trim() || `Nguyên liệu ${index + 1}`;
+    return {
+      id: item.id ?? index + 1,
+      // Spoonacular chỉ có tiếng Anh: hiện nguyên dòng gốc cho dễ đọc.
+      nameVi: item.original?.trim() || name,
+      nameEn: item.nameClean?.trim() || name,
+      quantity: typeof item.amount === 'number' ? Math.round(item.amount * 100) / 100 : null,
+      unit: item.unit?.trim() || null,
+      sortOrder: index,
+    };
+  });
 }
 
 // Đơn vị của Spoonacular trùng với ingredient_nutrition nên không
@@ -137,6 +208,64 @@ export class SpoonacularProvider implements RecipeProvider {
         reviewCount: 0,
       };
     });
+  }
+
+  // Chi tiết một món Spoonacular, trả về cùng định dạng với món nội bộ.
+  // Dinh dưỡng của Spoonacular đã tính sẵn theo một khẩu phần.
+  async getById(id: string): Promise<RecipeDetail> {
+    if (!/^\d+$/.test(id)) {
+      throw new NotFoundException(NOT_FOUND_MESSAGE);
+    }
+
+    const apiKey = this.config.get<string>('SPOONACULAR_API_KEY');
+    if (!apiKey) {
+      this.logger.warn('Thiếu SPOONACULAR_API_KEY, không xem được món Spoonacular');
+      throw new ServiceUnavailableException(UNAVAILABLE_MESSAGE);
+    }
+
+    let info: SpoonacularInformation;
+    try {
+      const url = new URL(`${INFORMATION_URL}/${id}/information`);
+      url.searchParams.set('includeNutrition', 'true');
+      const response = await fetch(url, {
+        headers: { 'x-api-key': apiKey },
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+      });
+      if (response.status === 404) {
+        throw new NotFoundException(NOT_FOUND_MESSAGE);
+      }
+      if (!response.ok) {
+        throw new Error(`Spoonacular trả về HTTP ${response.status}`);
+      }
+      info = (await response.json()) as SpoonacularInformation;
+    } catch (error) {
+      if (error instanceof NotFoundException) throw error;
+      this.logger.warn(`Không lấy được chi tiết món Spoonacular ${id}`, error);
+      throw new ServiceUnavailableException(UNAVAILABLE_MESSAGE);
+    }
+
+    const parsed = toParsedNutrition(info);
+    // Giống khối nutrition của món nội bộ: chỉ số phụ nào không có thì bỏ hẳn.
+    const nutrition = parsed
+      ? Object.fromEntries(Object.entries(parsed).filter(([, value]) => value !== null))
+      : null;
+
+    return {
+      id: String(info.id),
+      source: RecipeSource.SPOONACULAR,
+      title: info.title?.trim() || 'Món không tên',
+      imageUrl: info.image ?? null,
+      servings: info.servings && info.servings > 0 ? info.servings : 1,
+      readyInMinutes: info.readyInMinutes ?? null,
+      diets: toStringArray(info.diets),
+      dishTypes: toStringArray(info.dishTypes),
+      steps: toSteps(info),
+      videoUrl: null,
+      ingredients: toIngredients(info),
+      nutrition,
+      nutritionCoverage: nutrition ? NutritionCoverage.FULL : NutritionCoverage.NONE,
+      author: null,
+    };
   }
 
   /**

@@ -3,7 +3,6 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  NotImplementedException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
@@ -13,6 +12,7 @@ import { ReviewsService } from '../reviews/reviews.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import type { NutritionResult } from '../nutrition/nutrition.service';
 import { LocalDbProvider, toRecipeDetail } from './providers/local-db.provider';
+import { SpoonacularProvider } from './providers/spoonacular.provider';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import type { CreateRecipeIngredientDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -71,6 +71,7 @@ export class RecipesService {
 
   constructor(
     private readonly localDbProvider: LocalDbProvider,
+    private readonly spoonacularProvider: SpoonacularProvider,
     private readonly reviewsService: ReviewsService,
     private readonly nutritionService: NutritionService,
     private readonly prisma: PrismaService,
@@ -81,13 +82,11 @@ export class RecipesService {
     source: RecipeSource,
     userId: number,
   ): Promise<RecipeDetailResponse> {
-    // Điểm nối cho SpoonacularProvider: người làm tìm kiếm thay vào đây.
-    if (source === RecipeSource.SPOONACULAR) {
-      throw new NotImplementedException('Chưa hỗ trợ nguồn Spoonacular');
-    }
-
     // Provider ném 404 trước, nên id sai định dạng không chạy hai truy vấn dưới.
-    const detail = await this.localDbProvider.getById(id);
+    const detail =
+      source === RecipeSource.SPOONACULAR
+        ? await this.spoonacularProvider.getById(id)
+        : await this.localDbProvider.getById(id);
 
     // recipe_id ở favorites/recipe_reviews là VARCHAR: "007" phải tra cùng dòng với "7".
     const recipeId = normalizeRecipeId(id, source);

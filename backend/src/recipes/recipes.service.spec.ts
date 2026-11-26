@@ -2,7 +2,6 @@ import {
   ForbiddenException,
   Logger,
   NotFoundException,
-  NotImplementedException,
 } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { plainToInstance } from 'class-transformer';
@@ -12,6 +11,7 @@ import { NutritionCoverage, RecipeSource } from '../generated/prisma/enums';
 import { ReviewsService } from '../reviews/reviews.service';
 import { NutritionService } from '../nutrition/nutrition.service';
 import { LocalDbProvider } from './providers/local-db.provider';
+import { SpoonacularProvider } from './providers/spoonacular.provider';
 import { RecipesService } from './recipes.service';
 import { CreateRecipeDto } from './dto/create-recipe.dto';
 import { UpdateRecipeDto } from './dto/update-recipe.dto';
@@ -24,6 +24,10 @@ const detail = {
 } as RecipeDetail;
 
 const localDbProviderMock = {
+  getById: jest.fn(),
+};
+
+const spoonacularProviderMock = {
   getById: jest.fn(),
 };
 
@@ -173,6 +177,7 @@ describe('RecipesService', () => {
       providers: [
         RecipesService,
         { provide: LocalDbProvider, useValue: localDbProviderMock },
+        { provide: SpoonacularProvider, useValue: spoonacularProviderMock },
         { provide: ReviewsService, useValue: reviewsServiceMock },
         { provide: NutritionService, useValue: nutritionServiceMock },
         { provide: PrismaService, useValue: prismaMock },
@@ -196,15 +201,20 @@ describe('RecipesService', () => {
     });
   });
 
-  it('source SPOONACULAR thì 501 và không chạm LocalDbProvider', async () => {
-    await expect(
-      service.getById('716429', RecipeSource.SPOONACULAR, 7),
-    ).rejects.toThrow(
-      new NotImplementedException('Chưa hỗ trợ nguồn Spoonacular'),
-    );
+  it('source SPOONACULAR thì gọi SpoonacularProvider, không chạm LocalDbProvider', async () => {
+    spoonacularProviderMock.getById.mockResolvedValue({
+      ...detail,
+      id: '716429',
+      source: RecipeSource.SPOONACULAR,
+      author: null,
+    });
+
+    const result = await service.getById('716429', RecipeSource.SPOONACULAR, 7);
+
+    expect(spoonacularProviderMock.getById).toHaveBeenCalledWith('716429');
     expect(localDbProviderMock.getById).not.toHaveBeenCalled();
-    expect(reviewsServiceMock.getRatingSummary).not.toHaveBeenCalled();
-    expect(prismaMock.favorite.findUnique).not.toHaveBeenCalled();
+    expect(result.source).toBe(RecipeSource.SPOONACULAR);
+    expect(result.rating).toEqual({ average: 4.5, count: 2 });
   });
 
   it('chưa có đánh giá thì rating là { average: 0, count: 0 }', async () => {
