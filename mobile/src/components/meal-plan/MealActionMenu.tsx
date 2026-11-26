@@ -10,7 +10,7 @@ type Props = {
   onClose: () => void;
 };
 
-// "Overlay · Menu món kế hoạch": Đổi món (UC-23) / Xoá khỏi kế hoạch (UC-24) / Huỷ.
+// Menu thao tác của một món trong kế hoạch: Đổi món / Xoá khỏi kế hoạch / Huỷ.
 export function MealActionMenu({ visible, title, onChange, onRemove, onClose }: Props) {
   const insets = useSafeAreaInsets();
 

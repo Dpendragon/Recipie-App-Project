@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getToken } from '@/services/auth/authStorage';
 
-// Cache SQLite phân vùng theo user_id (Mục 7.12) nhưng AuthContext chưa giữ
+// Cache SQLite phân vùng theo user_id nhưng AuthContext chưa giữ
 // thông tin người dùng, nên đọc id từ claim `sub` của JWT đang lưu ({ sub: user.id }).
 // Chỉ giải mã phần payload để chọn đúng vùng cache trên máy, KHÔNG xác thực chữ ký:
 // mọi quyền truy cập dữ liệu vẫn do server kiểm tra bằng chính token này.

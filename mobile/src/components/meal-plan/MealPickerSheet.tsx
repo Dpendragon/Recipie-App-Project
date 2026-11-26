@@ -33,7 +33,7 @@ import { SOURCE_LABELS } from './MealSlotSection';
 
 const PAGE_SIZE = 20;
 
-// add: thêm món mới vào 1 buổi (UC-21). change: thay đúng 1 món đã gán (UC-23).
+// add: thêm món mới vào 1 buổi. change: thay đúng 1 món đã gán.
 export type PickerMode =
   | { type: 'add'; date: Date; slot: MealSlot }
   | { type: 'change'; date: Date; entry: MealPlanEntry };

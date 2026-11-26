@@ -1,4 +1,4 @@
-// Kiểu dữ liệu đánh giá, bám theo module reviews của backend (UC-12 → UC-16).
+// Kiểu dữ liệu đánh giá, bám theo module reviews của backend.
 
 import type { PageMeta, Paginated } from '@/types/pagination.types';
 import type { RecipeSource } from '@/types/recipe.types';
@@ -25,7 +25,7 @@ export interface Review {
   author: ReviewAuthor;
 }
 
-// Một dòng trong "Đánh giá của tôi" (UC-14): gộp đánh giá với tên/ảnh công thức.
+// Một dòng trong "Đánh giá của tôi": gộp đánh giá với tên/ảnh công thức.
 export interface MyReview {
   id: number;
   recipeId: string;
@@ -39,8 +39,8 @@ export interface MyReview {
   updatedAt: string;
 }
 
-// Body của POST /recipes/:id/reviews (UC-12 tạo mới và UC-15 sửa dùng chung một
-// endpoint upsert). Với SPOONACULAR phải gửi titleSnapshot (thiếu thì 400);
+// Body của POST /recipes/:id/reviews (tạo mới và sửa dùng chung một endpoint
+// upsert). Với SPOONACULAR phải gửi titleSnapshot (thiếu thì 400);
 // với LOCAL server tự lấy snapshot từ bảng recipes.
 export interface UpsertReviewRequest {
   rating: number;
@@ -54,7 +54,7 @@ export interface UpsertReviewResponse {
   summary: ReviewSummary;
 }
 
-// GET /recipes/:id/reviews (UC-13): điểm trung bình + đánh giá của mình +
+// GET /recipes/:id/reviews: điểm trung bình + đánh giá của mình +
 // đánh giá của người khác (data đã loại đánh giá của chính mình).
 export interface RecipeReviewsResponse {
   summary: ReviewSummary;

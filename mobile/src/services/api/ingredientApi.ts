@@ -5,7 +5,7 @@ import { apiClient } from './apiClient';
 export const AUTOCOMPLETE_MAX_LIMIT = 10;
 
 // GET /ingredients/autocomplete?q=&limit= — gợi ý nguyên liệu cho form đăng/sửa
-// công thức (UC-17, UC-19). Từ khoá rỗng server trả mảng rỗng chứ không báo lỗi,
+// công thức. Từ khoá rỗng server trả mảng rỗng chứ không báo lỗi,
 // nên không cần chặn trước ở màn hình.
 export async function autocomplete(q: string, limit?: number): Promise<IngredientSuggestion[]> {
   const { data } = await apiClient.get<IngredientSuggestion[]>('/ingredients/autocomplete', {
@@ -15,7 +15,7 @@ export async function autocomplete(q: string, limit?: number): Promise<Ingredien
 }
 
 // GET /ingredients/autocomplete?q= — gợi ý nguyên liệu tiếng Việt khi người dùng
-// gõ ở màn tìm kiếm (UC-05). signal để huỷ request cũ khi từ khoá đổi.
+// gõ ở màn tìm kiếm. signal để huỷ request cũ khi từ khoá đổi.
 export async function autocompleteIngredients(q: string, signal?: AbortSignal): Promise<Ingredient[]> {
   const { data } = await apiClient.get<Ingredient[]>('/ingredients/autocomplete', {
     params: { q },

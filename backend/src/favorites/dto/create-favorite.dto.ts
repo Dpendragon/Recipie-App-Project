@@ -11,10 +11,10 @@ import { RecipeSource } from '../../generated/prisma/enums';
 const trim = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
 
-// POST /favorites (UC-09). Khác reviews: source nằm trong body chứ không ở query,
+// POST /favorites. Khác reviews: source nằm trong body chứ không ở query,
 // vì endpoint không mang :id của công thức.
 export class CreateFavoriteDto {
-  // recipe_id là VARCHAR(50) (Mục 7.7) vì dùng chung cho LOCAL và Spoonacular.
+  // recipe_id là VARCHAR(50) vì dùng chung cho LOCAL và Spoonacular.
   @Transform(trim)
   @IsString({ message: 'Mã công thức không hợp lệ' })
   @IsNotEmpty({ message: 'Thiếu mã công thức' })

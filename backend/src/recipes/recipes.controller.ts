@@ -34,7 +34,7 @@ export class RecipesController {
   // Quy ước: route tĩnh (/recipes/search, /recipes/popular, /recipes/mine)
   // phải khai TRƯỚC @Get(':id').
 
-  // POST /recipes (UC-17)
+  // POST /recipes — đăng công thức
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateRecipeDto) {
     return this.recipesService.create(user.id, dto);
@@ -57,13 +57,13 @@ export class RecipesController {
     return this.aggregator.popular(query.limit, user.id);
   }
 
-  // GET /recipes/mine?cursor=&limit= (UC-18)
+  // GET /recipes/mine?cursor=&limit= — công thức mình đã đăng
   @Get('mine')
   listMine(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
     return this.recipesService.listMine(user.id, query);
   }
 
-  // GET /recipes/:id?source= (UC-08)
+  // GET /recipes/:id?source= — chi tiết công thức
   @Get(':id')
   getById(
     @CurrentUser() user: AuthUser,
@@ -73,7 +73,7 @@ export class RecipesController {
     return this.recipesService.getById(id, query.source, user.id);
   }
 
-  // PATCH /recipes/:id (UC-19). Chỉ nguồn LOCAL mới sửa được nên không có ?source=.
+  // PATCH /recipes/:id. Chỉ nguồn LOCAL mới sửa được nên không có ?source=.
   @Patch(':id')
   update(
     @CurrentUser() user: AuthUser,
@@ -83,7 +83,7 @@ export class RecipesController {
     return this.recipesService.update(user.id, id, dto);
   }
 
-  // DELETE /recipes/:id (UC-20)
+  // DELETE /recipes/:id — xoá công thức của mình
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@CurrentUser() user: AuthUser, @Param('id') id: string) {

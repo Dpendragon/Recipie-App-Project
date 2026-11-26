@@ -22,7 +22,7 @@ export type AuthContextValue = {
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-// Xoá cache offline của tài khoản đang đăng xuất (ghi chú cuối Mục 7.12): đọc
+// Xoá cache offline của tài khoản đang đăng xuất: đọc
 // userId từ token CÒN trong storage, nên phải gọi trước deleteToken. Dùng cho cả
 // đăng xuất chủ động và đăng xuất cưỡng bức khi token hết hạn. Xoá cache thất bại
 // không được chặn đăng xuất — token vẫn phải bị xoá.

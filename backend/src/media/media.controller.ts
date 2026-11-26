@@ -17,7 +17,7 @@ import type { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { MediaService } from './media.service';
 
-// POST /media/images (Mục 8): nhận ảnh rồi trả URL để mobile lưu vào
+// POST /media/images: nhận ảnh rồi trả URL để mobile lưu vào
 // recipes.image_url hoặc users.avatar_url. Ảnh chỉ đi qua bộ nhớ, không ghi đĩa
 // và không lưu binary trong MySQL.
 export const MAX_IMAGE_MB = 5;

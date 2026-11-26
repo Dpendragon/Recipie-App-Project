@@ -15,7 +15,7 @@ export type GroupedShopping = {
   bought: ShoppingItem[];
 };
 
-// Khoá nhóm hiển thị là cặp (source_recipe_id, source) — Mục 7.8.
+// Khoá nhóm hiển thị là cặp (source_recipe_id, source).
 export function recipeGroupKey(item: ShoppingItem): string | null {
   if (!item.sourceRecipeId) return null;
   return `${item.source ?? ''}:${item.sourceRecipeId}`;

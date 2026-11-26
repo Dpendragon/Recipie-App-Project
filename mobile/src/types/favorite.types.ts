@@ -1,11 +1,11 @@
-// Kiểu dữ liệu yêu thích, bám theo response của module favorites (UC-09 → UC-11).
+// Kiểu dữ liệu yêu thích, bám theo response của module favorites.
 
 import type { Paginated } from '@/types/pagination.types';
 import type { RecipeSource } from '@/types/recipe.types';
 
 export interface Favorite {
   // id của DÒNG favorites, không phải id công thức. Mobile cần nó để gọi
-  // DELETE /favorites/:id ở UC-11.
+  // DELETE /favorites/:id khi bỏ lưu.
   id: number;
   // Chuỗi để khớp recipe_id (VARCHAR) dùng chung cho LOCAL và Spoonacular.
   recipeId: string;

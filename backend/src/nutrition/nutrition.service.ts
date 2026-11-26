@@ -4,7 +4,7 @@ import { SpoonacularProvider } from '../recipes/providers/spoonacular.provider';
 import { Prisma } from '../generated/prisma/client';
 import { NutritionCoverage } from '../generated/prisma/enums';
 
-// Bốn chỉ số bắt buộc của ingredient_nutrition (Mục 7.5): luôn có mặt trong kết
+// Bốn chỉ số bắt buộc của ingredient_nutrition: luôn có mặt trong kết
 // quả khi coverage khác NONE.
 const MAIN_KEYS = ['calories', 'protein', 'fat', 'carbohydrates'] as const;
 // Ba chỉ số phụ: chỉ xuất hiện khi có ít nhất một nguyên liệu mang số liệu.
@@ -13,7 +13,7 @@ const EXTRA_KEYS = ['fiber', 'sugar', 'sodium'] as const;
 type MainKey = (typeof MAIN_KEYS)[number];
 type ExtraKey = (typeof EXTRA_KEYS)[number];
 
-// Quy đổi theo tỷ lệ trong cùng nhóm đơn vị (Mục 7.6 bước 4).
+// Quy đổi theo tỷ lệ trong cùng nhóm đơn vị (khối lượng, thể tích).
 const MASS_IN_GRAMS: Record<string, number> = { g: 1, kg: 1000 };
 const VOLUME_IN_MILLILITRES: Record<string, number> = { ml: 1, l: 1000 };
 
@@ -47,7 +47,7 @@ export type NutritionLine = {
   unit: string | null;
   // null khi dòng chưa đối chiếu được với danh mục ingredients.
   facts: IngredientFacts | null;
-  // Số liệu dự phòng từ Spoonacular cho dòng chưa đối chiếu được (Mục 7.6);
+  // Số liệu dự phòng từ Spoonacular cho dòng chưa đối chiếu được;
   // chỉ dùng để tính, không ghi vào danh mục nội bộ.
   fallback?: LineNutrition | null;
 };
@@ -77,8 +77,8 @@ function toNullableNumber(value: unknown): number | null {
 }
 
 /**
- * Quy đổi quantity/unit của một dòng về đúng basis_unit của ingredient
- * (Mục 7.6 bước 4). Trả về lượng tính theo basis_unit, hoặc null khi không quy
+ * Quy đổi quantity/unit của một dòng về đúng basis_unit của ingredient.
+ * Trả về lượng tính theo basis_unit, hoặc null khi không quy
  * đổi được: thiếu dữ liệu dinh dưỡng, thiếu quantity/unit, hoặc đơn vị không
  * thuộc cùng nhóm và cũng không trùng common_unit.
  */
@@ -135,8 +135,8 @@ function scaleBasis(basis: NutritionBasis, factor: number): LineNutrition {
 }
 
 /**
- * Cộng tổng các chỉ số, chia theo servings và xác định coverage
- * (Mục 7.6 bước 5 - 7). Dòng không quy đổi được bị bỏ qua, không làm sai tổng.
+ * Cộng tổng các chỉ số, chia theo servings và xác định coverage.
+ * Dòng không quy đổi được bị bỏ qua, không làm sai tổng.
  */
 export function computeRecipeNutrition(
   lines: NutritionLine[],
@@ -160,7 +160,7 @@ export function computeRecipeNutrition(
     const basis = line.facts?.nutrition;
 
     // Danh mục nội bộ là nguồn chính; số liệu dự phòng chỉ dùng cho dòng không
-    // đối chiếu/quy đổi được (Mục 7.6).
+    // đối chiếu/quy đổi được.
     const contribution =
       amount !== null && basis
         ? scaleBasis(basis, amount / basis.basisQuantity)
@@ -181,7 +181,7 @@ export function computeRecipeNutrition(
     }
   }
 
-  // Không dòng nào quy đổi được: nutrition để trống (UC-17 ngoại lệ 8a).
+  // Không dòng nào quy đổi được: nutrition để trống, công thức vẫn được lưu.
   if (converted === 0) {
     return { nutrition: null, coverage: NutritionCoverage.NONE };
   }
@@ -238,7 +238,7 @@ export class NutritionService {
 
   /**
    * Tính lại dinh dưỡng cho một công thức LOCAL và lưu vào recipes
-   * (Mục 7.6, dùng cho UC-17 và UC-19). Dòng không đối chiếu được với danh mục
+   * (dùng khi đăng và sửa công thức). Dòng không đối chiếu được với danh mục
    * nội bộ sẽ thử nguồn dự phòng Spoonacular.
    */
   async calculate(recipeId: number): Promise<NutritionResult> {
@@ -296,7 +296,7 @@ export class NutritionService {
 
   /**
    * Gán ingredient_id cho các dòng chưa đối chiếu, bằng cách so khớp CHÍNH XÁC
-   * name_en đã chuẩn hoá với ingredients.name_en (Mục 7.6 bước 2) — không fuzzy.
+   * name_en đã chuẩn hoá với ingredients.name_en — không fuzzy.
    */
   private async matchIngredients(
     rows: RecipeIngredientRow[],
@@ -346,7 +346,7 @@ export class NutritionService {
 
   /**
    * Nguồn dự phòng cho các dòng chưa đối chiếu được với danh mục nội bộ mà có
-   * name_en (Mục 7.6): gộp toàn bộ các dòng đó của công thức vào MỘT lần gọi
+   * name_en: gộp toàn bộ các dòng đó của công thức vào một lần gọi
    * parseIngredients. Kết quả chỉ dùng để tính, KHÔNG ghi ngược vào ingredients
    * hay ingredient_nutrition. Trả về map theo recipe_ingredients.id.
    */
@@ -382,8 +382,7 @@ export class NutritionService {
     );
   }
 
-  // Tải danh mục và ingredient_nutrition cho các dòng đã có ingredient_id
-  // (Mục 7.6 bước 3).
+  // Tải danh mục và ingredient_nutrition cho các dòng đã có ingredient_id.
   private async loadFacts(
     rows: RecipeIngredientRow[],
   ): Promise<Map<number, IngredientFacts>> {

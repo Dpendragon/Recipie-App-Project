@@ -21,8 +21,8 @@ import { getById, update } from '@/services/api/recipeApi';
 import type { RecipeDetail, UpdateRecipeRequest } from '@/types/recipe.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// UC-19 Sửa công thức đã đăng, theo frame 2003:10409 ở chế độ "chỉnh sửa"
-// (banner nhắc nằm trong RecipeForm) và 2075:1506 (toast).
+// Màn sửa công thức đã đăng: dùng lại form đăng ở chế độ "chỉnh sửa"
+// (banner nhắc nằm trong RecipeForm) kèm toast.
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -32,7 +32,7 @@ const REDIRECT_DELAY_MS = 900;
 const NOT_FOUND = 'Không tìm thấy công thức';
 const FORBIDDEN = 'Bạn không có quyền sửa công thức này';
 
-// Hai ngoại lệ không có cách sửa tại chỗ (4a của UC-19 và công thức đã bị xoá):
+// Hai lỗi không có cách sửa tại chỗ (không phải tác giả, công thức đã bị xoá):
 // báo rồi trả người dùng về màn trước, khác với lỗi mạng còn thử lại được.
 function fatalMessage(error: unknown): string | null {
   if (!isAxiosError(error)) return null;
@@ -87,8 +87,8 @@ export default function EditRecipeScreen() {
 
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  // Đã lưu thay đổi nhưng ảnh tải lên hỏng (UC-17 ngoại lệ 5a, frame
-  // 2041:26290): ở lại màn này thay vì tự sang màn chi tiết.
+  // Đã lưu thay đổi nhưng ảnh tải lên hỏng: ở lại màn này thay vì tự sang
+  // màn chi tiết.
   const [imageFailed, setImageFailed] = useState(false);
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -169,7 +169,7 @@ export default function EditRecipeScreen() {
       await update(recipeId, body);
       showToast('Đã lưu thay đổi');
       if (value.imageUploadFailed) {
-        // Ngoại lệ 5a: thay đổi đã lưu nhưng ảnh chưa lên được — giữ nguyên
+        // Thay đổi đã lưu nhưng ảnh chưa lên được — giữ nguyên
         // màn hình để người dùng lưu lại hoặc tự mở công thức.
         setImageFailed(true);
         setSubmitting(false);

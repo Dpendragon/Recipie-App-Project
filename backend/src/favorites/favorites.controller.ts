@@ -22,19 +22,19 @@ type AuthUser = { id: number };
 export class FavoritesController {
   constructor(private readonly favoritesService: FavoritesService) {}
 
-  // GET /favorites?cursor=&limit= (UC-10)
+  // GET /favorites?cursor=&limit= — danh sách yêu thích
   @Get()
   list(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
     return this.favoritesService.list(user.id, query);
   }
 
-  // POST /favorites (UC-09)
+  // POST /favorites — lưu yêu thích
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateFavoriteDto) {
     return this.favoritesService.create(user.id, dto);
   }
 
-  // DELETE /favorites/:id (UC-11). :id là id của dòng favorites, không phải
+  // DELETE /favorites/:id — bỏ lưu. :id là id của dòng favorites, không phải
   // recipe_id, nên ép kiểu số được ngay ở đây.
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)

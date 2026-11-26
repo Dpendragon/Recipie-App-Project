@@ -46,7 +46,7 @@ export function splitSteps(steps: string): string[] {
     .filter(Boolean);
 }
 
-// Tác giả đã xoá mềm thì coi như không có tác giả (UC-08).
+// Tác giả đã xoá mềm thì coi như không có tác giả.
 // Còn tài khoản nhưng chưa đặt tên thì hiển thị tên mặc định.
 function toAuthor(
   author: { id: number; name: string | null; deletedAt: Date | null } | null,
@@ -122,7 +122,7 @@ export class LocalDbProvider implements RecipeProvider {
 
   async getById(id: string): Promise<RecipeDetail> {
     const localId = parseLocalId(id);
-    // Id sai định dạng cũng coi như không tồn tại, để UC-08 chỉ có một thông báo.
+    // Id sai định dạng cũng coi như không tồn tại, để màn chi tiết chỉ có một thông báo.
     if (localId === null) {
       throw new NotFoundException('Không tìm thấy công thức');
     }

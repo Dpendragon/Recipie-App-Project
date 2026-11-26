@@ -9,7 +9,7 @@ import { CACHED_RECIPES_TABLE, getDatabase } from './database';
 // CRUD thuần trên bảng cached_recipes. File này KHÔNG quyết định khi nào nên
 // đọc/ghi cache — đó là việc của cacheManager.ts.
 
-// Cache chỉ giữ đúng các cột ở Mục 7.12, không đủ để dựng lại RecipeDetail
+// Cache chỉ giữ đúng các cột của bảng cached_recipes, không đủ để dựng lại RecipeDetail
 // (thiếu diets, dishTypes...), nên màn ngoại tuyến dùng kiểu riêng này.
 export interface CachedRecipe {
   userId: number;
@@ -23,7 +23,7 @@ export interface CachedRecipe {
   nutrition: RecipeNutrition | null;
   favoriteId: number | null;
   // Ba trường thêm ở schema v2: null với dòng do bản app cũ (v1) ghi, cho tới
-  // khi UC-09 ghi lại hoặc UC-08 làm mới dòng đó khi có mạng.
+  // khi lưu yêu thích lại hoặc mở chi tiết lúc có mạng làm mới dòng đó.
   servings: number | null;
   readyInMinutes: number | null;
   nutritionCoverage: NutritionCoverage | null;
@@ -31,10 +31,10 @@ export interface CachedRecipe {
   cachedAt: string;
 }
 
-// Dữ liệu đầy đủ để ghi mới một dòng cache (chỉ UC-09 có đủ).
+// Dữ liệu đầy đủ để ghi mới một dòng cache (chỉ lúc lưu yêu thích mới có đủ).
 export type CachedRecipeInput = Omit<CachedRecipe, 'cachedAt'>;
 
-// Phần chi tiết mà UC-08 làm mới được khi có mạng.
+// Phần chi tiết mà màn chi tiết làm mới được khi có mạng.
 export interface CachedRecipeDetailPatch {
   title: string | null;
   imageUrl: string | null;
@@ -83,7 +83,7 @@ function normalizeRecipeId(recipeId: string, source: RecipeSource): string {
   return String(Number(trimmed));
 }
 
-// Cột steps là TEXT một chuỗi (Mục 7.12), nối theo dòng giống bảng recipes.
+// Cột steps là TEXT một chuỗi, nối theo dòng giống bảng recipes.
 function serializeSteps(steps: string[]): string {
   return steps.join('\n');
 }
@@ -125,7 +125,7 @@ function toCachedRecipe(row: CachedRecipeRow): CachedRecipe {
   };
 }
 
-// Quy tắc ghi (1) — CHỈ UC-09 được dùng: tạo mới hoặc ghi đè toàn bộ record.
+// Quy tắc ghi (1) — chỉ dùng khi lưu yêu thích: tạo mới hoặc ghi đè toàn bộ record.
 export async function upsertFull(input: CachedRecipeInput): Promise<void> {
   const db = await getDatabase();
   await db.runAsync(
@@ -153,7 +153,7 @@ export async function upsertFull(input: CachedRecipeInput): Promise<void> {
   );
 }
 
-// Quy tắc ghi (2) — UC-08 khi có mạng: chỉ UPDATE dòng đã tồn tại của đúng
+// Quy tắc ghi (2) — xem chi tiết khi có mạng: chỉ UPDATE dòng đã tồn tại của đúng
 // user_id + recipe_id + source, không tạo cache cho công thức chưa yêu thích.
 // favorite_id dùng COALESCE để không xoá mất giá trị cũ khi người gọi không biết.
 // servings, ready_in_minutes, nutrition_coverage ghi thẳng theo dữ liệu server
@@ -193,7 +193,7 @@ export async function updateIfExists(
   return result.changes > 0;
 }
 
-// Quy tắc ghi (3) — UC-10 khi có mạng: CHỈ title/image của dòng đã tồn tại.
+// Quy tắc ghi (3) — danh sách yêu thích khi có mạng: chỉ title/image của dòng đã tồn tại.
 // Tuyệt đối không đụng tới ingredients, steps, video_url, nutrition, servings,
 // ready_in_minutes, nutrition_coverage, vì danh sách yêu thích không mang những
 // dữ liệu đó và sẽ làm mất chi tiết đã cache.
@@ -225,7 +225,7 @@ export async function updateTitleImageIfExists(
   return result.changes > 0;
 }
 
-// UC-11: bỏ yêu thích thì xoá luôn dòng cache tương ứng.
+// Bỏ yêu thích thì xoá luôn dòng cache tương ứng.
 export async function remove(
   userId: number,
   recipeId: string,
@@ -239,7 +239,7 @@ export async function remove(
   );
 }
 
-// UC-10 khi mất mạng: danh sách công thức đã cache của riêng tài khoản này,
+// Danh sách yêu thích khi mất mạng: công thức đã cache của riêng tài khoản này,
 // mới cache gần nhất lên trước.
 export async function listByUser(userId: number): Promise<CachedRecipe[]> {
   const db = await getDatabase();
@@ -252,7 +252,7 @@ export async function listByUser(userId: number): Promise<CachedRecipe[]> {
   return rows.map(toCachedRecipe);
 }
 
-// UC-08 khi mất mạng: đọc lại chi tiết đã lưu tạm.
+// Chi tiết công thức khi mất mạng: đọc lại chi tiết đã lưu tạm.
 export async function get(
   userId: number,
   recipeId: string,

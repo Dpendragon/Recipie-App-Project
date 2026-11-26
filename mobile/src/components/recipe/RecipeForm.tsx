@@ -13,10 +13,9 @@ import { uploadImage } from '@/services/api/mediaApi';
 import type { IngredientSuggestion } from '@/types/ingredient.types';
 import type { RecipeIngredientInput } from '@/types/recipe.types';
 
-// Form dùng chung cho "Đăng công thức mới" (UC-17) và "Chỉnh sửa công thức"
-// (UC-19), theo frame 2003:10409 và trạng thái đang gửi 2041:26469. Khối "Ảnh
-// món ăn" theo 2003:10409, bảng chọn nguồn ảnh theo 2041:26802 và thông báo
-// tải ảnh thất bại theo 2041:26290.
+// Form dùng chung cho "Đăng công thức mới" và "Chỉnh sửa công thức", gồm
+// trạng thái đang gửi, khối "Ảnh món ăn", bảng chọn nguồn ảnh và thông báo
+// tải ảnh thất bại.
 
 // Một dòng nguyên liệu khi đang soạn: giữ nguyên chuỗi người dùng gõ, chỉ đổi
 // sang số lúc gửi. key để React giữ đúng ô khi thêm/xoá giữa danh sách.
@@ -54,7 +53,7 @@ export type RecipeFormSubmit = {
   // string: ảnh vừa tải lên. null: người dùng đã bấm "Gỡ ảnh".
   imageUrl: string | null | undefined;
   // true khi có ảnh mới nhưng tải lên hỏng: màn hình lưu công thức xong thì
-  // phải ở lại và báo thiếu ảnh (UC-17 ngoại lệ 5a).
+  // phải ở lại và báo thiếu ảnh.
   imageUploadFailed: boolean;
 };
 
@@ -76,9 +75,9 @@ type Props = {
   submitting: boolean;
   // Lỗi server trả về khi gửi.
   submitError: string | null;
-  // Công thức đã lưu xong nhưng ảnh tải lên thất bại (UC-17 ngoại lệ 5a): màn
-  // hình truyền hàm mở công thức vừa lưu, form hiện thông báo kèm nút "Xem
-  // công thức" theo frame 2041:26290. Bỏ trống khi chưa gặp ngoại lệ này.
+  // Công thức đã lưu xong nhưng ảnh tải lên thất bại: màn hình truyền hàm mở
+  // công thức vừa lưu, form hiện thông báo kèm nút "Xem công thức". Bỏ trống
+  // khi chưa gặp trường hợp này.
   onViewSaved?: () => void;
   onSubmit: (value: RecipeFormSubmit) => void;
 };
@@ -99,8 +98,8 @@ const SUGGEST_LIMIT = 5;
 // chọn để ảnh gốc từ máy ảnh điện thoại không bị từ chối.
 const IMAGE_QUALITY = 0.8;
 
-// UC-17 ngoại lệ 5a: upload hỏng thì công thức vẫn được lưu, chỉ tạm thời chưa
-// có ảnh; người dùng bổ sung sau qua UC-19 (frame 2041:26290).
+// Upload hỏng thì công thức vẫn được lưu, chỉ tạm thời chưa có ảnh; người
+// dùng bổ sung sau bằng cách sửa công thức.
 const IMAGE_FAILED_MESSAGE = 'Công thức vẫn được lưu, bạn có thể thêm ảnh sau';
 const IMAGE_PICK_FAILED_MESSAGE = 'Không mở được thư viện ảnh. Vui lòng thử lại.';
 const CAMERA_DENIED_MESSAGE =
@@ -170,7 +169,7 @@ export function RecipeForm({
   const [savedImageUrl] = useState<string | null>(() => initialValue?.imageUrl ?? null);
   const [uploading, setUploading] = useState(false);
   const [imageNotice, setImageNotice] = useState<string | null>(null);
-  // Bảng "Chọn ảnh" trượt từ dưới lên (frame 2041:26802).
+  // Bảng "Chọn ảnh" trượt từ dưới lên.
   const [sourceSheetOpen, setSourceSheetOpen] = useState(false);
 
   const isEdit = mode === 'edit';
@@ -218,7 +217,7 @@ export function RecipeForm({
     setLocalUri(asset.uri);
   };
 
-  // "Chọn từ thư viện" (frame 2041:26802): launchImageLibraryAsync không cần
+  // "Chọn từ thư viện": launchImageLibraryAsync không cần
   // xin quyền trước với ảnh.
   const pickFromLibrary = async () => {
     setSourceSheetOpen(false);
@@ -234,7 +233,7 @@ export function RecipeForm({
     }
   };
 
-  // "Chụp ảnh" (frame 2041:26802): máy ảnh bắt buộc phải xin quyền trước. Từ
+  // "Chụp ảnh": máy ảnh bắt buộc phải xin quyền trước. Từ
   // chối thì chỉ báo lại và ở nguyên form, người dùng vẫn chọn được từ thư viện.
   const takePhoto = async () => {
     setSourceSheetOpen(false);
@@ -275,7 +274,7 @@ export function RecipeForm({
       try {
         return { imageUrl: await uploadImage(localUri), uploadFailed: false };
       } catch {
-        // UC-17 ngoại lệ 5a: vẫn lưu công thức, chỉ là chưa có ảnh mới.
+        // Vẫn lưu công thức, chỉ là chưa có ảnh mới.
         return { imageUrl: undefined, uploadFailed: true };
       } finally {
         setUploading(false);
@@ -288,7 +287,7 @@ export function RecipeForm({
     return { imageUrl: undefined, uploadFailed: false };
   };
 
-  // Ngoại lệ 2a của UC-17: thiếu tên món, số người ăn hoặc nguyên liệu thì báo
+  // Thiếu tên món, số người ăn hoặc nguyên liệu thì báo
   // lỗi ngay tại form, không gọi API. Các kiểm tra còn lại bám theo CreateRecipeDto.
   const submit = async () => {
     if (busy) return;
@@ -368,7 +367,7 @@ export function RecipeForm({
 
   return (
     <View style={styles.form}>
-      {/* Đã lưu nhưng ảnh hỏng (frame 2041:26290): ở lại màn, tự bấm để xem. */}
+      {/* Đã lưu nhưng ảnh hỏng: ở lại màn, tự bấm để xem. */}
       {onViewSaved ? (
         <View style={styles.savedNotice}>
           <Text style={styles.savedNoticeText}>{IMAGE_FAILED_MESSAGE}</Text>
@@ -392,7 +391,7 @@ export function RecipeForm({
           <Text style={styles.sectionMeta}>Không bắt buộc</Text>
         </View>
 
-        {/* Chạm vùng ảnh để mở bảng chọn nguồn ảnh (frame 2041:26802). */}
+        {/* Chạm vùng ảnh để mở bảng chọn nguồn ảnh. */}
         <Pressable
           onPress={() => setSourceSheetOpen(true)}
           disabled={busy}
@@ -632,7 +631,7 @@ export function RecipeForm({
         />
       ) : null}
 
-      {/* Bảng chọn nguồn ảnh (frame 2041:26802). */}
+      {/* Bảng chọn nguồn ảnh. */}
       <Modal
         visible={sourceSheetOpen}
         transparent
@@ -837,7 +836,7 @@ function IngredientRow({
 
 const styles = StyleSheet.create({
   form: { gap: 22 },
-  // Trạng thái đang gửi (frame 2041:26469): các ô nhập mờ 40%.
+  // Trạng thái đang gửi: các ô nhập mờ 40%.
   faded: { opacity: 0.4 },
 
   general: { gap: 16 },
@@ -873,8 +872,8 @@ const styles = StyleSheet.create({
   sectionMeta: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
   hint: { fontFamily: fonts.regular, fontSize: 11, lineHeight: 16.5, color: colors.textMid },
 
-  // Khối "Ảnh món ăn" (frame 2003:10409): ảnh xem trước 215 px, bên dưới là
-  // hàng hành động chọn ảnh / gỡ ảnh (frame 2041:26802).
+  // Khối "Ảnh món ăn": ảnh xem trước 215 px, bên dưới là hàng hành động
+  // chọn ảnh / gỡ ảnh.
   imageBlock: { gap: 12 },
   preview: {
     width: '100%',
@@ -898,7 +897,7 @@ const styles = StyleSheet.create({
   imageLink: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.primary },
   imageRemove: { fontFamily: fonts.semiBold, fontSize: 12, color: colors.textMuted },
 
-  // Thông báo "đã lưu nhưng chưa có ảnh" kèm nút mở công thức (2041:26307).
+  // Thông báo "đã lưu nhưng chưa có ảnh" kèm nút mở công thức.
   savedNotice: {
     gap: 10,
     padding: 14,
@@ -912,7 +911,7 @@ const styles = StyleSheet.create({
     color: extraColors.warningText,
   },
 
-  // Bảng chọn nguồn ảnh (frame 2041:26803): trượt từ đáy, bo góc trên 24.
+  // Bảng chọn nguồn ảnh: trượt từ đáy, bo góc trên 24.
   sheetBackdrop: { flex: 1, justifyContent: 'flex-end', backgroundColor: extraColors.overlay },
   sheet: {
     gap: 20,

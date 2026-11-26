@@ -1,4 +1,4 @@
-// Định dạng dùng chung cho các thành phần đánh giá (UC-12 → UC-16).
+// Định dạng dùng chung cho các thành phần đánh giá.
 
 // Dải 5 sao cho số sao nguyên 1–5 (hoặc điểm trung bình, làm tròn về sao gần nhất).
 export function formatStars(value: number): string {

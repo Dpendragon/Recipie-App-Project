@@ -8,7 +8,7 @@ type Props = {
   toast: ToastState | null;
 };
 
-// Toast theo frame 2075:1506: nền xanh đậm, chữ trắng, dấu tick, nổi phía dưới
+// Toast theo thiết kế: nền xanh đậm, chữ trắng, dấu tick, nổi phía dưới
 // màn hình. Biến thể 'error' (hoàn tác khi lưu/bỏ lưu lỗi) không có trong Figma:
 // dùng nền màu lỗi của theme và bỏ dấu tick để không gây hiểu nhầm là thành công.
 // Đặt làm phần tử cuối của màn hình để nằm trên nội dung.

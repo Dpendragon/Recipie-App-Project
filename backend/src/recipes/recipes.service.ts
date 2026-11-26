@@ -20,8 +20,8 @@ import type { RecipeDetailResponse } from './providers/recipe-provider.interface
 
 export type PageMeta = { nextCursor: number | null; hasMore: boolean };
 
-// Mục "Response chỉ được thêm trường": mỗi phần tử của GET /recipes/mine gồm
-// đúng 6 trường này. id là recipes.id (Int) và cũng là cursor của trang sau.
+// Mỗi phần tử của GET /recipes/mine gồm đúng 6 trường này (chỉ thêm, không bớt).
+// id là recipes.id (Int) và cũng là cursor của trang sau.
 export type MyRecipeItem = {
   id: number;
   title: string;
@@ -100,12 +100,12 @@ export class RecipesService {
     return { ...detail, rating, favoriteId };
   }
 
-  // POST /recipes (UC-17). Công thức mới luôn là nguồn LOCAL.
+  // POST /recipes. Công thức mới luôn là nguồn LOCAL.
   async create(
     userId: number,
     dto: CreateRecipeDto,
   ): Promise<RecipeDetailResponse> {
-    // Chỉ bọc phần ghi DB: nutrition (Mục 7.6) gọi API ngoài nên phải nằm ngoài
+    // Chỉ bọc phần ghi DB: nutrition có thể gọi API ngoài nên phải nằm ngoài
     // transaction, thêm sau ở bước tính dinh dưỡng.
     const row = await this.prisma.$transaction(async (tx) => {
       const recipe = await tx.recipe.create({
@@ -121,9 +121,9 @@ export class RecipesService {
           steps: dto.steps.join('\n'),
           imageUrl: dto.imageUrl ?? null,
           videoUrl: dto.videoUrl ?? null,
-          // Giá trị khởi tạo cho bước 8: nếu bước tính dinh dưỡng dưới đây
-          // không chạy được thì công thức vẫn nằm đúng ở trạng thái NONE
-          // (UC-17 ngoại lệ 8a), không phải NULL mập mờ.
+          // Giá trị khởi tạo: nếu bước tính dinh dưỡng dưới đây không chạy
+          // được thì công thức vẫn nằm đúng ở trạng thái NONE, không phải
+          // NULL mập mờ.
           nutritionCoverage: NutritionCoverage.NONE,
         },
         include: {
@@ -152,9 +152,9 @@ export class RecipesService {
       return { ...recipe, ingredients };
     });
 
-    // UC-17 bước 8: tính dinh dưỡng NGOÀI transaction (Mục 7.6) vì bước này có
-    // thể gọi nguồn ngoài. Lỗi ở đây không được làm mất công thức vừa lưu
-    // (ngoại lệ 8a): chỉ ghi log và giữ coverage = NONE.
+    // Tính dinh dưỡng ngoài transaction vì bước này có thể gọi nguồn ngoài.
+    // Lỗi ở đây không được làm mất công thức vừa lưu: chỉ ghi log và giữ
+    // coverage = NONE.
     let nutrition: NutritionResult = {
       nutrition: null,
       coverage: NutritionCoverage.NONE,
@@ -179,8 +179,8 @@ export class RecipesService {
     };
   }
 
-  // GET /recipes/mine (UC-18). Chỉ công thức của chính người đang đăng nhập,
-  // id giảm dần, cursor-based theo ghi chú phân trang ở Mục 8.
+  // GET /recipes/mine. Chỉ công thức của chính người đang đăng nhập,
+  // id giảm dần, phân trang theo cursor.
   async listMine(
     userId: number,
     query: { cursor?: number; limit?: number },
@@ -207,7 +207,7 @@ export class RecipesService {
     return takePage<MyRecipeItem>(rows, limit);
   }
 
-  // PATCH /recipes/:id (UC-19). Chỉ tác giả sửa được công thức của mình.
+  // PATCH /recipes/:id. Chỉ tác giả sửa được công thức của mình.
   async update(
     userId: number,
     id: string,
@@ -217,7 +217,7 @@ export class RecipesService {
 
     // Chỉ ghi lại nguyên liệu khi danh sách gửi lên thực sự khác danh sách đang
     // lưu: form sửa luôn gửi cả danh sách, mà xoá rồi tạo lại sẽ mất
-    // ingredient_id đã đối chiếu được (Mục 7.3).
+    // ingredient_id đã đối chiếu được.
     const sent = Array.isArray(dto.ingredients) ? dto.ingredients : null;
     const nextIngredients: CreateRecipeIngredientDto[] | null =
       sent !== null &&
@@ -230,7 +230,7 @@ export class RecipesService {
       dto.servings !== null &&
       dto.servings !== current.servings;
 
-    // UC-19 bước 5: recipes và recipe_ingredients đi cùng một transaction.
+    // recipes và recipe_ingredients đi cùng một transaction.
     // Field vắng mặt để undefined cho Prisma bỏ qua, tức là "không sửa phần đó".
     await this.prisma.$transaction(async (tx) => {
       await tx.recipe.update({
@@ -270,9 +270,9 @@ export class RecipesService {
       }
     });
 
-    // Mục 7.6: chỉ tính lại khi nguyên liệu, quantity, unit hoặc servings đổi.
+    // Chỉ tính lại dinh dưỡng khi nguyên liệu, quantity, unit hoặc servings đổi.
     // Đổi tên món, ảnh, video hay các bước thì giữ nguyên dinh dưỡng cũ.
-    // Giống UC-17, bước này nằm NGOÀI transaction và lỗi ở đây không được làm
+    // Giống lúc đăng, bước này nằm ngoài transaction và lỗi ở đây không được làm
     // mất phần đã sửa.
     if (nextIngredients !== null || servingsChanged) {
       try {
@@ -289,20 +289,20 @@ export class RecipesService {
     return this.getById(id, RecipeSource.LOCAL, userId);
   }
 
-  // DELETE /recipes/:id (UC-20). Chỉ tác giả xoá được công thức của mình.
+  // DELETE /recipes/:id. Chỉ tác giả xoá được công thức của mình.
   async remove(userId: number, id: string): Promise<void> {
     const current = await this.findOwnRecipe(userId, id);
 
     // Chỉ xoá dòng recipes: recipe_ingredients tự xoá theo ON DELETE CASCADE
-    // (Mục 7.11). favorites, recipe_reviews và meal_plan_entries không có FK
+    // favorites, recipe_reviews và meal_plan_entries không có FK
     // cứng tới recipes nên vừa không bị xoá theo, vừa không chặn lệnh xoá này —
     // các FK RESTRICT trong schema đều trỏ tới users, không phải recipes. Nội
-    // dung người khác tạo được giữ lại theo quy tắc nghiệp vụ của UC-20.
+    // dung người khác tạo (đánh giá, yêu thích, kế hoạch) vẫn được giữ lại.
     await this.prisma.recipe.delete({ where: { id: current.id } });
   }
 
-  // Dùng chung cho UC-19 và UC-20: không tồn tại thì 404, không phải của mình
-  // thì 403 (ghi chú Mục 8 và ngoại lệ 4a của cả hai use case).
+  // Dùng chung cho sửa và xoá: không tồn tại thì 404, không phải của mình
+  // thì 403.
   private async findOwnRecipe(
     userId: number,
     id: string,
@@ -316,7 +316,7 @@ export class RecipesService {
       unit: string | null;
     }[];
   }> {
-    // Id sai định dạng cũng coi như không tồn tại, giống UC-08.
+    // Id sai định dạng cũng coi như không tồn tại, giống màn chi tiết công thức.
     if (!isLocalId(id)) {
       throw new NotFoundException('Không tìm thấy công thức');
     }

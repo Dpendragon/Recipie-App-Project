@@ -11,7 +11,7 @@ type Props = {
   onConfirm: () => void;
 };
 
-// Hộp xác nhận xoá đánh giá (frame 2020:1028): lớp phủ đen 40%, hộp trắng giữa màn hình.
+// Hộp xác nhận xoá đánh giá: lớp phủ đen 40%, hộp trắng giữa màn hình.
 export function DeleteReviewDialog({ visible, deleting, onCancel, onConfirm }: Props) {
   const cancel = () => {
     if (!deleting) onCancel();

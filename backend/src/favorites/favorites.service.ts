@@ -11,7 +11,7 @@ import { CreateFavoriteDto } from './dto/create-favorite.dto';
 
 export type PageMeta = { nextCursor: number | null; hasMore: boolean };
 
-// Mục "Response chỉ được thêm trường": mỗi phần tử gồm đúng 6 trường này.
+// Mỗi phần tử trả về gồm đúng 6 trường này, đổi gì thì chỉ được thêm trường.
 // id là id của dòng favorites (mobile cần nó để gọi DELETE /favorites/:id).
 export type FavoriteItem = {
   id: number;
@@ -46,14 +46,14 @@ function takePage<T extends { id: number }>(
 export class FavoritesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // UC-09. Ngoại lệ 2a: đã có sẵn thì giữ nguyên, không báo lỗi.
+  // Lưu yêu thích. Đã lưu từ trước thì giữ nguyên, không báo lỗi.
   async create(userId: number, dto: CreateFavoriteDto): Promise<FavoriteItem> {
     const { recipeId, titleSnapshot, imageSnapshot } =
       await this.resolveRecipe(dto);
 
     // upsert thay cho findUnique + create: hai request song song cùng bấm tim
     // sẽ không làm request thua cuộc vỡ vì UNIQUE(user_id, recipe_id, source).
-    // update rỗng vì UC-09 2a yêu cầu giữ nguyên bản ghi cũ.
+    // update rỗng để giữ nguyên bản ghi cũ khi đã lưu từ trước.
     const favorite = await this.prisma.favorite.upsert({
       where: {
         userId_recipeId_source: { userId, recipeId, source: dto.source },
@@ -71,7 +71,7 @@ export class FavoritesService {
     return toFavoriteItem(favorite);
   }
 
-  // UC-10: danh sách yêu thích, cursor-based theo ghi chú phân trang ở Mục 8.
+  // Danh sách yêu thích, phân trang theo cursor.
   async list(
     userId: number,
     query: { cursor?: number; limit?: number },
@@ -109,7 +109,7 @@ export class FavoritesService {
     };
   }
 
-  // UC-11. Ngoại lệ 2a: đã bỏ lưu từ trước thì coi như hoàn tất, không báo lỗi.
+  // Bỏ lưu. Đã bỏ lưu từ trước (vd từ thiết bị khác) thì coi như xong, không báo lỗi.
   // Lọc thêm userId nên favorite của người khác cũng không xoá được, và vì luôn
   // trả 204 nên người gọi không suy ra được bản ghi đó có tồn tại hay không.
   async remove(userId: number, id: number): Promise<void> {
@@ -136,7 +136,7 @@ export class FavoritesService {
       };
     }
 
-    // Id sai định dạng cũng coi như không tồn tại, giống UC-08.
+    // Id sai định dạng cũng coi như không tồn tại, giống màn chi tiết công thức.
     if (!isLocalId(dto.recipeId)) {
       throw new NotFoundException('Không tìm thấy công thức');
     }
@@ -165,7 +165,7 @@ export class FavoritesService {
   }
 
   // Ghép dữ liệu sống cho các dòng LOCAL bằng một truy vấn gom id.
-  // Không dùng include: favorites không có FK tới recipes (Mục "Quy ước chung").
+  // Không dùng include: favorites không có FK tới recipes.
   private async loadLocalRecipes(
     rows: FavoriteRow[],
   ): Promise<Map<string, { title: string; imageUrl: string | null }>> {

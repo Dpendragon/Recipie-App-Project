@@ -91,7 +91,7 @@ function takePage<T extends { id: number }>(
 export class ReviewsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // UC-12 + UC-15: một endpoint duy nhất, upsert theo (userId, recipeId, source).
+  // Tạo mới và sửa dùng một endpoint duy nhất, upsert theo (userId, recipeId, source).
   async upsert(
     userId: number,
     id: string,
@@ -131,7 +131,7 @@ export class ReviewsService {
     return { review: toReviewItem(review), summary };
   }
 
-  // UC-13: điểm trung bình + đánh giá của mình + đánh giá của người khác.
+  // Đánh giá của một công thức: điểm trung bình + đánh giá của mình + đánh giá của người khác.
   async listByRecipe(
     userId: number,
     id: string,
@@ -178,7 +178,7 @@ export class ReviewsService {
     };
   }
 
-  // UC-14: toàn bộ đánh giá của chính mình, gộp từ mọi công thức.
+  // Toàn bộ đánh giá của chính mình, gộp từ mọi công thức.
   async listMine(
     userId: number,
     query: { cursor?: number; limit?: number },
@@ -221,7 +221,7 @@ export class ReviewsService {
     };
   }
 
-  // UC-16: chỉ xoá đúng đánh giá của chính mình.
+  // Chỉ xoá đúng đánh giá của chính mình.
   async remove(
     userId: number,
     id: string,
@@ -290,7 +290,7 @@ export class ReviewsService {
       };
     }
 
-    // Id sai định dạng cũng coi như không tồn tại, giống UC-08.
+    // Id sai định dạng cũng coi như không tồn tại, giống màn chi tiết công thức.
     if (!isLocalId(id)) {
       throw new NotFoundException('Không tìm thấy công thức');
     }

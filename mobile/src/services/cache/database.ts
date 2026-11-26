@@ -1,7 +1,7 @@
 import * as SQLite from 'expo-sqlite';
 
 // SQLite trên thiết bị (expo-sqlite), tách biệt hoàn toàn với MySQL của server.
-// Mục đích duy nhất: xem lại công thức đã yêu thích khi mất mạng (Mục 7.12).
+// Mục đích duy nhất: xem lại công thức đã yêu thích khi mất mạng.
 
 export const CACHE_DATABASE_NAME = 'recipe_cache.db';
 export const CACHED_RECIPES_TABLE = 'cached_recipes';

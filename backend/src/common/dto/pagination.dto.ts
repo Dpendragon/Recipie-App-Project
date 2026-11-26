@@ -1,8 +1,8 @@
 import { Type } from 'class-transformer';
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 
-// Dùng chung cho các danh sách "Nhóm A" (favorites, reviews/mine, recipes/mine)
-// theo ghi chú phân trang ở Mục 8: cursor-based, không dùng offset.
+// Dùng chung cho các danh sách một nguồn (favorites, reviews/mine, recipes/mine):
+// phân trang theo cursor, không dùng offset.
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 50;
 

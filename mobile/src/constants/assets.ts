@@ -26,7 +26,7 @@ export const icons = {
   mailCheck: icon(require('../../assets/icons/ac-mail-check.svg'), 18, 18),
   mailCheckRed: icon(require('../../assets/icons/ac-mail-check-red.svg'), 18, 18),
 
-  // Chi tiết công thức (UC-08)
+  // Chi tiết công thức
   clock: icon(require('../../assets/icons/rd-clock.svg'), 21, 21), // thời gian nấu
   users: icon(require('../../assets/icons/rd-users.svg'), 21, 21), // số khẩu phần
   flame: icon(require('../../assets/icons/rd-flame.svg'), 21, 21), // năng lượng (kcal)
@@ -39,7 +39,7 @@ export const icons = {
   calendar: icon(require('../../assets/icons/rd-calendar.svg'), 19, 19), // thêm vào kế hoạch bữa ăn
   play: icon(require('../../assets/icons/rd-play.svg'), 22, 22), // nút phát video
 
-  // Yêu thích (UC-09 → UC-11)
+  // Yêu thích
   heartCard: icon(require('../../assets/icons/fv-heart-card.svg'), 18, 18), // nút tim trên ảnh thẻ
   heartEmpty: icon(require('../../assets/icons/fv-heart-empty.svg'), 34, 34), // minh hoạ danh sách rỗng
   wifiOff: icon(require('../../assets/icons/fv-wifi-off.svg'), 18, 18), // banner đang ngoại tuyến
@@ -47,11 +47,11 @@ export const icons = {
   toastCheck: icon(require('../../assets/icons/fv-toast-check.svg'), 19, 19), // dấu tick trên toast
   calendarGreen: icon(require('../../assets/icons/fv-calendar.svg'), 19, 19), // nút phụ "Thêm món vào kế hoạch"
 
-  // Đánh giá (UC-12 → UC-16)
+  // Đánh giá
   starOutline: icon(require('../../assets/icons/rv-star-outline.svg'), 35, 35), // sao chưa chọn
   starFilled: icon(require('../../assets/icons/rv-star-filled.svg'), 35, 35), // sao đã chọn
 
-  // Đăng và sửa công thức (UC-17, UC-19). Bản 19px màu xám của clock-3 và
+  // Đăng và sửa công thức. Bản 19px màu xám của clock-3 và
   // users-round: rd-clock, rd-users là cùng hình nhưng 21px màu xanh của màn chi tiết.
   formServings: icon(require('../../assets/icons/rf-users.svg'), 19, 19), // ô "Số người ăn"
   formMinutes: icon(require('../../assets/icons/rf-clock.svg'), 19, 19), // ô "Thời gian (phút)"
@@ -61,7 +61,7 @@ export const icons = {
   formPencil: icon(require('../../assets/icons/rf-pencil.svg'), 18, 18), // banner "Đang sửa món đã đăng"
   formSalad: icon(require('../../assets/icons/rf-salad.svg'), 18, 18), // banner ghi chú dinh dưỡng
 
-  // Công thức của tôi (UC-18, UC-20). Cùng hình notebook-pen nhưng hai bản khác
+  // Công thức của tôi. Cùng hình notebook-pen nhưng hai bản khác
   // nét: 18px cho banner ghi chú, 34px (nét 1.5) cho minh hoạ danh sách rỗng.
   notebookPen: icon(require('../../assets/icons/mr-notebook-pen.svg'), 18, 18),
   notebookPenEmpty: icon(require('../../assets/icons/mr-notebook-pen-lg.svg'), 34, 34),

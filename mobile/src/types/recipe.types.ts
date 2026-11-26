@@ -52,8 +52,8 @@ export interface RecipeDetail {
   nutrition: RecipeNutrition | null;
   nutritionCoverage: NutritionCoverage | null;
 
-  // Ba trường dưới đây được bổ sung ở Bước 6 (B2). Backend hiện tại chưa trả,
-  // nên để optional: màn hình phải chạy được với cả response cũ lẫn mới.
+  // Ba trường dưới đây được thêm sau nên để optional: màn hình phải chạy được
+  // với cả response cũ lẫn mới.
   author?: RecipeAuthor | null;
   rating?: RecipeRating;
   favoriteId?: number | null;
@@ -69,7 +69,7 @@ export interface RecipeIngredientInput {
   unit?: string;
 }
 
-// Body của POST /recipes (UC-17), khớp CreateRecipeDto. Không có description và
+// Body của POST /recipes, khớp CreateRecipeDto. Không có description và
 // không có source: công thức tự đăng luôn là nguồn LOCAL.
 export interface CreateRecipeRequest {
   title: string;
@@ -85,7 +85,7 @@ export interface CreateRecipeRequest {
   ingredients: RecipeIngredientInput[];
 }
 
-// Body của PATCH /recipes/:id (UC-19), khớp UpdateRecipeDto (PartialType):
+// Body của PATCH /recipes/:id, khớp UpdateRecipeDto (PartialType):
 // field nào bỏ khỏi body thì server không sửa phần đó. Riêng ba cột nullable
 // dưới đây nhận null để xoá giá trị cũ; title, servings, steps và ingredients
 // gửi lên thì phải hợp lệ (steps/ingredients không được rỗng).
@@ -97,7 +97,7 @@ export type UpdateRecipeRequest = Partial<
   videoUrl?: string | null;
 };
 
-// Một dòng của GET /recipes/mine (UC-18): chỉ 6 trường để hiển thị dạng lưới,
+// Một dòng của GET /recipes/mine: chỉ 6 trường để hiển thị dạng lưới,
 // muốn xem đầy đủ thì gọi tiếp GET /recipes/:id.
 export interface MyRecipe {
   // id dòng recipes (Int) và cũng là cursor của trang sau.

@@ -1,6 +1,6 @@
 import { apiClient } from './apiClient';
 
-// POST /media/images (Mục 8): gửi ảnh dạng multipart/form-data, nhận lại URL
+// POST /media/images: gửi ảnh dạng multipart/form-data, nhận lại URL
 // để lưu vào recipes.image_url. Backend chỉ nhận JPEG, PNG, WebP và tối đa 5 MB.
 
 // Ảnh nặng hơn JSON nhiều nên nới hạn chờ riêng, không dùng API_TIMEOUT_MS.

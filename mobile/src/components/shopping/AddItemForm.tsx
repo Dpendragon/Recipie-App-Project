@@ -14,7 +14,7 @@ type Props = {
   onCancel: () => void;
 };
 
-// Form thêm tay 1 nguyên liệu vào khu vực "Của tôi" (UC-25).
+// Form thêm tay 1 nguyên liệu vào khu vực "Của tôi".
 export function AddItemForm({ onSubmit, onCancel }: Props) {
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('');
@@ -27,7 +27,7 @@ export function AddItemForm({ onSubmit, onCancel }: Props) {
     const trimmedName = name.trim();
     const trimmedQuantity = quantity.trim();
 
-    // Luồng ngoại lệ 3a: tên trống thì báo lỗi ngay tại form, chưa gọi API.
+    // Tên trống thì báo lỗi ngay tại form, chưa gọi API.
     const nextNameError = !trimmedName
       ? 'Vui lòng nhập tên nguyên liệu'
       : trimmedName.length > NAME_MAX_LENGTH

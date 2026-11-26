@@ -68,7 +68,7 @@ export default function ShoppingScreen() {
     }
   }, []);
 
-  // Tải lại mỗi lần mở tab, vì dòng có thể được thêm từ màn chi tiết công thức (UC-26).
+  // Tải lại mỗi lần mở tab, vì dòng có thể được thêm từ màn chi tiết công thức.
   useFocusEffect(
     useCallback(() => {
       load();
@@ -84,7 +84,7 @@ export default function ShoppingScreen() {
   const replaceItem = (updated: ShoppingItem) =>
     setItems((prev) => prev.map((it) => (it.id === updated.id ? updated : it)));
 
-  // UC-27 — đổi trên giao diện trước, lỗi thì trả lại như cũ.
+  // Đánh dấu đã mua — đổi trên giao diện trước, lỗi thì trả lại như cũ.
   const handleToggle = async (item: ShoppingItem) => {
     const nextChecked = !item.checked;
     replaceItem({ ...item, checked: nextChecked });
@@ -92,7 +92,7 @@ export default function ShoppingScreen() {
       replaceItem(await updateShoppingItem(item.id, { checked: nextChecked }));
     } catch (error) {
       if (isNotFound(error)) {
-        // 2a: dòng đã bị xoá ở thiết bị khác -> làm mới danh sách.
+        // Dòng đã bị xoá ở thiết bị khác -> làm mới danh sách.
         await load();
         return;
       }
@@ -101,7 +101,7 @@ export default function ShoppingScreen() {
     }
   };
 
-  // UC-29 — xoá ngay trên giao diện; DELETE luôn trả 204 nên 2a không báo lỗi.
+  // Xoá dòng ngay trên giao diện; DELETE luôn trả 204 nên dòng đã xoá từ trước cũng không báo lỗi.
   const handleDelete = async (item: ShoppingItem) => {
     if (expandedId === item.id) setExpandedId(null);
     setItems((prev) => prev.filter((it) => it.id !== item.id));
@@ -113,7 +113,7 @@ export default function ShoppingScreen() {
     }
   };
 
-  // UC-28
+  // Lưu ghi chú của một dòng
   const handleSaveNote = async (item: ShoppingItem, note: string) => {
     try {
       replaceItem(await updateShoppingItem(item.id, { note: note.trim() || null }));
@@ -130,7 +130,7 @@ export default function ShoppingScreen() {
     }
   };
 
-  // UC-25
+  // Thêm tay một nguyên liệu
   const handleAdd = async (name: string, quantity: string) => {
     try {
       const created = await createShoppingItem({ name, quantity: quantity || undefined });

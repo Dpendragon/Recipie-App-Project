@@ -11,7 +11,7 @@ import {
 const trim = ({ value }: { value: unknown }): unknown =>
   typeof value === 'string' ? value.trim() : value;
 
-// Dùng chung cho tạo mới (UC-12) và sửa (UC-15) vì endpoint là một upsert.
+// Dùng chung cho tạo mới và sửa vì endpoint là một upsert.
 export class CreateReviewDto {
   // Prisma không khai báo CHECK nên 1-5 chỉ chặn được ở đây.
   @IsInt({ message: 'Số sao phải là số nguyên' })

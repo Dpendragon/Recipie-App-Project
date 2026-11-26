@@ -1,6 +1,6 @@
 export type RecipeSource = 'LOCAL' | 'SPOONACULAR';
 
-// 1 dòng trong danh sách mua sắm (bảng shopping_items, Mục 7.8).
+// 1 dòng trong danh sách mua sắm (bảng shopping_items).
 export type ShoppingItem = {
   id: number;
   name: string;
@@ -15,13 +15,13 @@ export type ShoppingItem = {
   updatedAt: string;
 };
 
-// POST /shopping-items (UC-25)
+// POST /shopping-items
 export type CreateShoppingItemRequest = {
   name: string;
   quantity?: string;
 };
 
-// PATCH /shopping-items/:id — chỉ sửa checked (UC-27) và note (UC-28).
+// PATCH /shopping-items/:id — chỉ sửa checked và note.
 export type UpdateShoppingItemRequest = {
   checked?: boolean;
   note?: string | null;

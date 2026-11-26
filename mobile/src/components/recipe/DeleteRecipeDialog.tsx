@@ -13,7 +13,7 @@ type Props = {
   onConfirm: () => void;
 };
 
-// Hộp xác nhận xoá công thức đã đăng (UC-20, frame 2020:1035): lớp phủ đen 40%,
+// Hộp xác nhận xoá công thức đã đăng: lớp phủ đen 40%,
 // hộp trắng giữa màn hình, nút "Giữ lại" và "Xóa công thức".
 export function DeleteRecipeDialog({ visible, title, deleting, onCancel, onConfirm }: Props) {
   const cancel = () => {

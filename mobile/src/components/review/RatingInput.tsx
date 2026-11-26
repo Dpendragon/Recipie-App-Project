@@ -11,7 +11,7 @@ type Props = {
 
 const STARS = [1, 2, 3, 4, 5] as const;
 
-// Hàng chọn 1–5 sao (frame 2003:9237): 5 ô 35×35, cách nhau 12. Sao chưa chọn
+// Hàng chọn 1–5 sao: 5 ô 35×35, cách nhau 12. Sao chưa chọn
 // là icon viền xám của Figma; sao đã chọn cùng hình, tô vàng #C58A35.
 export function RatingInput({ value, onChange, disabled = false }: Props) {
   return (

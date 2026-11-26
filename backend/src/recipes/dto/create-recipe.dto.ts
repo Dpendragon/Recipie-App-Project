@@ -32,7 +32,7 @@ export class CreateRecipeIngredientDto {
   @MaxLength(255, { message: 'Tên nguyên liệu tối đa 255 ký tự' })
   nameVi!: string;
 
-  // Tuỳ chọn, dùng để đối chiếu danh mục dinh dưỡng (Mục 7.3).
+  // Tuỳ chọn, dùng để đối chiếu danh mục dinh dưỡng.
   @Transform(trim)
   @IsOptional()
   @IsString({ message: 'Tên nguyên liệu tiếng Anh không hợp lệ' })
@@ -53,8 +53,8 @@ export class CreateRecipeIngredientDto {
   unit?: string;
 }
 
-// Dữ liệu đăng công thức cá nhân (UC-17). Không có description: class diagram
-// không có cột này và Bước 6, 7 không tạo migration.
+// Dữ liệu đăng công thức cá nhân. Không có description vì bảng recipes
+// không có cột này.
 export class CreateRecipeDto {
   @Transform(trim)
   @IsString({ message: 'Tên món không hợp lệ' })

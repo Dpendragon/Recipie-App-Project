@@ -1,4 +1,4 @@
-// Phân trang cursor-based dùng chung cho các danh sách "Nhóm A" của backend
+// Phân trang cursor-based dùng chung cho các danh sách một nguồn của backend
 // (favorites, reviews/mine, recipes/mine): server trả { data, meta }.
 
 export interface PageMeta {

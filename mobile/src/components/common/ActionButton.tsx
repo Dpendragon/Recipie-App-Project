@@ -7,16 +7,16 @@ import { Icon } from './Icon';
 type Props = {
   title: string;
   onPress: () => void;
-  // 'danger': kiểu "Xóa" của thành phần Nút (nút "Xóa đánh giá", frame 2020:1028).
+  // 'danger': kiểu nút "Xóa" (vd nút "Xóa đánh giá" trong hộp xác nhận).
   variant?: 'primary' | 'secondary' | 'danger';
   icon?: IconAsset;
   // Đang gửi request: hiện vòng quay thay cho chữ và chặn bấm lại.
   loading?: boolean;
-  // Nút cần mạng khi đang xem bản lưu ngoại tuyến: mờ 40% như frame 2041:25924.
+  // Nút cần mạng khi đang xem bản lưu ngoại tuyến: mờ 40%.
   disabled?: boolean;
 };
 
-// Thành phần "Nút hành động" của Figma (2014:784): cao 52, bo tròn, chữ 14, gap 9.
+// Nút hành động theo thiết kế: cao 52, bo tròn, chữ 14, gap 9.
 // Không dùng components/common/Button vì nút đó đang dùng chữ 15 và chỉ có biến
 // thể viền trắng, còn các màn công thức cần cả biến thể nền xanh nhạt.
 export function ActionButton({

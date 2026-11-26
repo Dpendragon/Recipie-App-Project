@@ -28,8 +28,8 @@ import { mine, remove } from '@/services/api/recipeApi';
 import type { MyRecipe } from '@/types/recipe.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// UC-18 Xem công thức đã đăng và UC-20 Xoá công thức đã đăng (frame 2003:10587
-// có dữ liệu, 2003:8911 rỗng, 2020:1035 overlay xoá, 2075:1506 toast). Thẻ không
+// Công thức của tôi: xem và xoá công thức đã đăng (có dữ liệu, rỗng, hộp xác
+// nhận xoá, toast). Thẻ không
 // có điểm sao, chỉ "N phút · N người" lấy từ readyInMinutes và servings.
 
 type Phase = 'loading' | 'ready' | 'error';
@@ -135,7 +135,7 @@ export default function MyRecipesScreen() {
     }
   };
 
-  // UC-20: chỉ bỏ thẻ khỏi danh sách sau khi server đã nhận. 404 nghĩa là công
+  // Xoá: chỉ bỏ thẻ khỏi danh sách sau khi server đã nhận. 404 nghĩa là công
   // thức đã bị xoá từ thiết bị khác, cũng coi như xoá xong.
   const confirmDelete = async () => {
     const recipe = pendingDelete;
@@ -163,7 +163,7 @@ export default function MyRecipesScreen() {
     router.push({ pathname: '/recipe/[id]', params: { id: String(recipe.id), source: 'LOCAL' } });
   };
 
-  // UC-19: mở form sửa của đúng công thức đó.
+  // Mở form sửa của đúng công thức đó.
   const openEdit = (recipe: MyRecipe) => {
     router.push({ pathname: '/recipe/[id]/edit', params: { id: String(recipe.id) } });
   };

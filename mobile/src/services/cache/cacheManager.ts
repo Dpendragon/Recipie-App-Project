@@ -7,11 +7,11 @@ import * as recipeApi from '../api/recipeApi';
 import type { CachedRecipe } from './recipeCache';
 import * as recipeCache from './recipeCache';
 
-// Nơi duy nhất quyết định KHI NÀO đọc cache, cập nhật cache, xoá cache — đúng 3
-// quy tắc ghi ở Mục 7.12. Mọi hàm đều nhận userId vì cache phân vùng theo
+// Nơi duy nhất quyết định khi nào đọc cache, cập nhật cache, xoá cache — theo
+// 3 quy tắc ghi bên recipeCache.ts. Mọi hàm đều nhận userId vì cache phân vùng theo
 // (user_id, recipe_id, source): không có userId thì không được đụng vào cache.
 
-// Mất mạng và công thức chưa từng được yêu thích (UC-08, ngoại lệ 2c).
+// Mất mạng và công thức chưa từng được yêu thích.
 export class OfflineCacheMissError extends Error {
   constructor(message = 'Cần kết nối mạng để xem công thức này') {
     super(message);
@@ -19,7 +19,7 @@ export class OfflineCacheMissError extends Error {
   }
 }
 
-// Mất mạng và chưa từng lưu công thức nào trên máy (UC-10, ngoại lệ 2c).
+// Mất mạng và chưa từng lưu công thức nào trên máy.
 export class OfflineEmptyCacheError extends Error {
   constructor(message = 'Chưa có công thức nào để xem khi mất mạng') {
     super(message);
@@ -34,7 +34,7 @@ export type RecipeDetailResult =
   | { origin: 'cache'; recipe: CachedRecipe };
 
 // Dòng yêu thích dựng lại từ cache. favoriteId có thể null nếu dòng cache được
-// ghi bởi bản app cũ; khi đó phải có mạng (UC-10) mới bỏ yêu thích được.
+// ghi bởi bản app cũ; khi đó phải có mạng mới bỏ yêu thích được.
 export interface CachedFavorite {
   favoriteId: number | null;
   recipeId: string;
@@ -66,9 +66,9 @@ function isNetworkFailure(error: unknown): boolean {
   return isAxiosError(error) && !error.response;
 }
 
-// UC-08. Có mạng: lấy dữ liệu sống rồi làm mới cache theo quy tắc ghi (2) — chỉ
+// Chi tiết công thức. Có mạng: lấy dữ liệu sống rồi làm mới cache theo quy tắc ghi (2) — chỉ
 // UPDATE dòng đã tồn tại, không tạo cache cho công thức chưa từng yêu thích.
-// Mất mạng (hoặc gọi API thất bại vì mạng): rơi về cache theo luồng thay thế 2a.
+// Mất mạng (hoặc gọi API thất bại vì mạng): rơi về bản đã cache.
 export async function getRecipeDetail(params: {
   userId: number;
   recipeId: string;
@@ -122,8 +122,8 @@ async function readDetailFromCache(
   return { origin: 'cache', recipe: cached };
 }
 
-// UC-09. Lưu yêu thích trên server trước, có id dòng favorites rồi mới ghi cache
-// theo quy tắc ghi (1) — đây là use case DUY NHẤT được INSERT/REPLACE cả record.
+// Lưu yêu thích trên server trước, có id dòng favorites rồi mới ghi cache
+// theo quy tắc ghi (1) — đây là chỗ duy nhất được INSERT/REPLACE cả record.
 // Cần RecipeDetail đầy đủ nên chỉ gọi được từ màn chi tiết công thức.
 export async function saveFavorite(params: {
   userId: number;
@@ -161,8 +161,8 @@ export async function saveFavorite(params: {
   return favorite;
 }
 
-// UC-10. Có mạng: lấy danh sách rồi làm mới cache theo quy tắc ghi (3) — CHỈ
-// title/image của dòng đã tồn tại. Mất mạng: hiển thị từ cache (luồng 2a), và
+// Danh sách yêu thích. Có mạng: lấy danh sách rồi làm mới cache theo quy tắc
+// ghi (3) — chỉ title/image của dòng đã tồn tại. Mất mạng: hiển thị từ cache, và
 // chỉ cho trang đầu vì cache không có cursor của server.
 export async function listFavorites(params: {
   userId: number;
@@ -232,8 +232,8 @@ async function readFavoritesFromCache(
   };
 }
 
-// UC-11. Server trả 204 kể cả khi bản ghi đã bị bỏ lưu từ thiết bị khác
-// (ngoại lệ 2a), nên cứ xoá dòng cache sau đó. Chỉ xoá cache khi server đã
+// Bỏ lưu. Server trả 204 kể cả khi bản ghi đã bị bỏ lưu từ thiết bị khác,
+// nên cứ xoá dòng cache sau đó. Chỉ xoá cache khi server đã
 // nhận, tránh trường hợp mất cache mà trên server vẫn còn yêu thích.
 export async function removeFavorite(params: {
   userId: number;
@@ -247,7 +247,7 @@ export async function removeFavorite(params: {
 }
 
 // Logout hoặc chuyển tài khoản: xoá cache của tài khoản hiện tại để tài khoản
-// mới không đọc được dữ liệu cũ (ghi chú cuối Mục 7.12).
+// mới không đọc được dữ liệu cũ.
 export async function clearCacheForUser(userId: number): Promise<void> {
   await recipeCache.clearForUser(userId);
 }

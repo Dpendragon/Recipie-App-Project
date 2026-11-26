@@ -34,8 +34,8 @@ import {
 import type { RecipeSource } from '@/types/recipe.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// UC-10 Xem danh sách yêu thích (frame 2003:8848 có dữ liệu, 2003:8968 rỗng,
-// 2041:25858 ngoại tuyến, 2003:9028 đang tải) và UC-11 bỏ lưu ngay trên thẻ.
+// Tab Yêu thích: danh sách đã lưu (có dữ liệu, rỗng, ngoại tuyến, đang tải)
+// và bỏ lưu ngay trên thẻ.
 
 type Phase = 'loading' | 'ready' | 'offlineEmpty' | 'error';
 
@@ -57,7 +57,7 @@ const SOURCE_LABEL: Record<RecipeSource, string> = {
 
 const PAGE_SIZE = 10;
 const NEED_NETWORK_TO_UNSAVE = 'Cần kết nối mạng để bỏ lưu';
-// Màu khung xương ở frame đang tải: đậm hơn cho khối chính, nhạt hơn cho dòng phụ.
+// Màu khung xương lúc đang tải: đậm hơn cho khối chính, nhạt hơn cho dòng phụ.
 const SKELETON_STRONG = colors.border;
 const SKELETON_SOFT = extraColors.skeletonSoft;
 
@@ -194,7 +194,7 @@ export default function FavoritesScreen() {
     }
   };
 
-  // UC-11: gỡ thẻ ngay (lạc quan), trả lại đúng vị trí cũ nếu server không nhận.
+  // Bỏ lưu: gỡ thẻ ngay (lạc quan), trả lại đúng vị trí cũ nếu server không nhận.
   // Cache chỉ bị xoá trong cacheManager sau khi server đã trả 204.
   const unsave = async (item: FavoriteItem) => {
     if (typeof userId !== 'number' || removingRef.current.has(item.key)) return;
@@ -307,7 +307,7 @@ export default function FavoritesScreen() {
             title="Chưa có công thức yêu thích"
             message="Khám phá công thức bạn thích và chạm biểu tượng trái tim để thêm vào Yêu thích."
             actionTitle="Khám phá món ngon"
-            // Chưa có màn khám phá (UC-06/UC-07), tạm đưa về tab chính.
+            // Chưa nối sang màn tìm kiếm, tạm đưa về tab chính.
             onAction={() => router.navigate('/(app)/(tabs)')}
             footnote="Một nơi để giữ những hương vị bạn muốn nấu lại."
             style={styles.emptyInList}
@@ -478,7 +478,7 @@ function Bar({
   return <View style={{ width, height, borderRadius: barRadius, backgroundColor: color }} />;
 }
 
-// Frame đang tải 2003:9028: khung xương theo đúng bố cục thẻ lớn + hai thẻ nhỏ.
+// Trạng thái đang tải: khung xương theo đúng bố cục thẻ lớn + hai thẻ nhỏ.
 function FavoritesSkeleton() {
   return (
     <View

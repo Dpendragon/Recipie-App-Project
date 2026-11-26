@@ -7,7 +7,7 @@ import { RatingInput } from './RatingInput';
 
 export const COMMENT_MAX_LENGTH = 1000;
 
-// Lời nhận xét ngắn theo số sao, ghép vào dòng gợi ý "5/5 · Rất ngon! …" (frame 2003:10768).
+// Lời nhận xét ngắn theo số sao, ghép vào dòng gợi ý "5/5 · Rất ngon! …".
 const RATING_LABEL: Record<number, string> = {
   1: 'Chưa hợp khẩu vị.',
   2: 'Tạm được.',
@@ -17,13 +17,13 @@ const RATING_LABEL: Record<number, string> = {
 };
 
 type Props = {
-  // 'create': chưa có đánh giá (frame 2003:9237); 'edit': sửa đánh giá đã có (2003:10768).
+  // 'create': chưa có đánh giá; 'edit': sửa đánh giá đã có.
   mode: 'create' | 'edit';
   rating: number;
   comment: string;
   onChangeRating: (value: number) => void;
   onChangeComment: (value: string) => void;
-  // Lỗi tại form khi chưa chọn sao (UC-12 2a).
+  // Lỗi tại form khi chưa chọn sao.
   ratingError: string | null;
   // Lỗi server trả về khi gửi.
   submitError: string | null;
@@ -89,7 +89,7 @@ export function ReviewForm({
           <ActivityIndicator color={colors.white} />
         </View>
       ) : rating === 0 ? (
-        // Frame 2003:9237: chưa chọn sao thì nút xám. Vẫn bấm được để báo lỗi tại
+        // Chưa chọn sao thì nút xám. Vẫn bấm được để báo lỗi tại
         // form thay vì im lặng; onSubmit tự chặn không gửi.
         <Pressable
           onPress={onSubmit}

@@ -58,7 +58,7 @@ export default function MealPlanScreen() {
     }
   }, []);
 
-  // Tải khi mở tab và mỗi khi đổi tuần (UC-22).
+  // Tải khi mở tab và mỗi khi đổi tuần.
   useFocusEffect(
     useCallback(() => {
       load(weekStart);
@@ -81,7 +81,7 @@ export default function MealPlanScreen() {
     setRefreshing(false);
   };
 
-  // UC-24 — gỡ ngay trên giao diện, lỗi thì trả lại.
+  // Xoá món — gỡ ngay trên giao diện, lỗi thì trả lại.
   const handleRemove = async (entry: MealPlanEntry) => {
     setMenuEntry(null);
     setEntries((prev) => prev.filter((e) => e.id !== entry.id));

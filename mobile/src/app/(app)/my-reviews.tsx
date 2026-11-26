@@ -26,8 +26,8 @@ import type { RecipeSource } from '@/types/recipe.types';
 import type { MyReview } from '@/types/review.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// UC-14 Xem danh sách đánh giá của mình (frame 2003:10678 có dữ liệu,
-// 2041:25851 rỗng). Màn chỉ đọc: sửa (UC-15) và xoá (UC-16) vẫn làm ở màn
+// Danh sách đánh giá của mình (có dữ liệu hoặc rỗng). Màn chỉ đọc: sửa và
+// xoá vẫn làm ở màn
 // đánh giá của công thức, mở từ chi tiết công thức.
 
 type Phase = 'loading' | 'ready' | 'error';
@@ -190,7 +190,7 @@ export default function MyReviewsScreen() {
             title="Bạn chưa đánh giá công thức nào"
             message="Nấu thử một món bạn thích rồi để lại vài dòng nhận xét, đánh giá của bạn sẽ hiện ở đây."
             actionTitle="Khám phá công thức"
-            // Chưa có màn khám phá (UC-06/UC-07), tạm đưa về tab chính.
+            // Chưa nối sang màn tìm kiếm, tạm đưa về tab chính.
             onAction={() => router.navigate('/(app)/(tabs)')}
             style={styles.emptyInList}
           />

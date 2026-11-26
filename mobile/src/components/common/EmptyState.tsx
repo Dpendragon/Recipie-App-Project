@@ -21,7 +21,7 @@ type Props = {
 };
 
 // Khung trạng thái trống/ngoại lệ: vòng tròn xanh nhạt chứa icon, tiêu đề, mô tả,
-// nút chính. Dùng cho UC-08 (2003:9313, 2003:9341) và UC-10 rỗng (2003:8968).
+// nút chính. Dùng cho màn chi tiết (không tìm thấy, mất mạng) và Yêu thích rỗng.
 export function EmptyState({
   icon,
   title,

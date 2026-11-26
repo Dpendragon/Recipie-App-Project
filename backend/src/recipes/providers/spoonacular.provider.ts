@@ -22,7 +22,7 @@ interface SpoonacularRecipe {
   missedIngredients?: unknown[];
 }
 
-// Đơn vị của Spoonacular trùng với ingredient_nutrition (Mục 7.5) nên không
+// Đơn vị của Spoonacular trùng với ingredient_nutrition nên không
 // phải quy đổi: kcal cho calories, g cho protein/fat/carbohydrates/fiber/sugar,
 // mg cho sodium.
 export type ParsedNutrition = {
@@ -39,8 +39,7 @@ type Nutrient = { name?: unknown; amount?: unknown };
 
 /**
  * Đọc mảng nutrition.nutrients của một dòng đã parse. Trả null khi thiếu bất kỳ
- * chỉ số chính nào — dòng đó coi như không có dữ liệu dinh dưỡng hợp lệ
- * (Mục 7.5).
+ * chỉ số chính nào — dòng đó coi như không có dữ liệu dinh dưỡng hợp lệ.
  */
 function toParsedNutrition(item: unknown): ParsedNutrition | null {
   const nutrients = (item as { nutrition?: { nutrients?: unknown } } | null)
@@ -141,13 +140,13 @@ export class SpoonacularProvider implements RecipeProvider {
   }
 
   /**
-   * Gọi POST /recipes/parseIngredients MỘT lần cho cả công thức (Mục 7.6) và
+   * Gọi POST /recipes/parseIngredients một lần cho cả công thức và
    * trả về dinh dưỡng của từng dòng theo đúng thứ tự đầu vào; phần tử null là
    * dòng Spoonacular không ước tính được.
    *
    * Đây chỉ là nguồn dự phòng: thiếu SPOONACULAR_API_KEY hoặc gọi lỗi thì ghi
-   * log rồi trả về mảng rỗng, không ném lỗi, để việc lưu công thức (UC-17,
-   * UC-19) không bị ảnh hưởng.
+   * log rồi trả về mảng rỗng, không ném lỗi, để việc đăng/sửa công thức
+   * không bị ảnh hưởng.
    */
   async parseIngredients(lines: string[]): Promise<(ParsedNutrition | null)[]> {
     if (lines.length === 0) return [];

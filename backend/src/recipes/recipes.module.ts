@@ -9,7 +9,7 @@ import { SpoonacularProvider } from './providers/spoonacular.provider';
 
 // PrismaModule là @Global nên không cần import ở đây.
 // ReviewsModule chỉ để dùng ReviewsService.getRatingSummary() (một chiều, không vòng).
-// NutritionModule để tính dinh dưỡng sau khi tạo công thức (Mục 7.6).
+// NutritionModule để tính dinh dưỡng sau khi tạo công thức.
 @Module({
   imports: [ReviewsModule, NutritionModule],
   controllers: [RecipesController],

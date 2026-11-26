@@ -6,7 +6,7 @@ import { formatReviewDate, formatStars } from './format';
 
 type Props = {
   review: Review;
-  // 'mine': thẻ viền xanh trong mục "Đánh giá của bạn" (frame 2003:9171).
+  // 'mine': thẻ viền xanh trong mục "Đánh giá của bạn".
   // 'other': một dòng trong "Từ những căn bếp khác".
   variant?: 'mine' | 'other';
 };

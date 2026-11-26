@@ -44,7 +44,7 @@ import type {
 import type { Review } from '@/types/review.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// Màn hình chỉ có 5 trạng thái; 'offline' và 'notFound' là hai nhánh ngoại lệ của UC-08.
+// Màn hình chỉ có 5 trạng thái; 'offline' và 'notFound' là hai nhánh lỗi riêng.
 type Status = 'loading' | 'ready' | 'notFound' | 'offline' | 'error';
 
 // Kết quả đã xong của một lần tải. 'loading' không nằm ở đây: trạng thái tải
@@ -139,9 +139,9 @@ function isNetworkError(error: unknown): boolean {
   return isAxiosError(error) && !error.response;
 }
 
-// Quy lỗi tải công thức về đúng nhánh ngoại lệ của UC-08.
+// Quy lỗi tải công thức về đúng trạng thái hiển thị.
 function toFailure(error: unknown): Settled {
-  // Mất mạng và công thức chưa từng được lưu yêu thích (2c).
+  // Mất mạng và công thức chưa từng được lưu yêu thích.
   if (error instanceof OfflineCacheMissError) return { kind: 'offline' };
   if (isAxiosError(error)) {
     if (error.response?.status === 404) return { kind: 'notFound' };
@@ -236,12 +236,12 @@ export default function RecipeDetailScreen() {
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ key: string; state: Settled } | null>(null);
   const [favoriteOverride, setFavoriteOverride] = useState<FavoriteState | null>(null);
-  // Đánh giá nổi bật của khối "Cả nhà nói gì?" (UC-13, lấy 1 dòng).
+  // Đánh giá nổi bật của khối "Cả nhà nói gì?" (chỉ lấy 1 dòng).
   const [featured, setFeatured] = useState<{ key: string; review: Review | null } | null>(null);
   // Chặn bấm tim liên tiếp khi yêu cầu trước chưa xong.
   const favoritePendingRef = useRef(false);
 
-  // Đổi mạng cũng tải lại: mất mạng thì chuyển sang bản lưu trên máy (UC-08 2a),
+  // Đổi mạng cũng tải lại: mất mạng thì chuyển sang bản lưu trên máy,
   // có mạng lại thì lấy dữ liệu mới nhất và làm mới bản lưu đó.
   const requestKey = `${id ?? ''}|${source}|${attempt}|${isOnline ? 'online' : 'offline'}|${userId ?? ''}`;
   // Kết quả cũ của request khác (đổi id, đổi nguồn, bấm thử lại) không được dùng,
@@ -264,7 +264,7 @@ export default function RecipeDetailScreen() {
     : null;
   const featuredReview = featured?.key === requestKey ? featured.review : null;
 
-  // Tải ngầm đánh giá nổi bật (UC-13, limit=1): ưu tiên đánh giá của mình, không
+  // Tải ngầm đánh giá nổi bật (limit=1): ưu tiên đánh giá của mình, không
   // có thì lấy dòng mới nhất. Mất mạng thì bỏ qua, khối đánh giá về trạng thái rỗng.
   const loadFeatured = useCallback(
     (key: string, signal: { cancelled: boolean }) => {
@@ -310,7 +310,7 @@ export default function RecipeDetailScreen() {
     };
   }, [id, loadFeatured, requestKey, userId]);
 
-  // Quay lại từ màn đánh giá: điểm trung bình có thể đã đổi (UC-12, UC-15, UC-16)
+  // Quay lại từ màn đánh giá: điểm trung bình có thể đã đổi (gửi, sửa hoặc xoá)
   // nên tải lại ngầm, giữ nội dung đang hiển thị thay vì nhấp nháy về trạng thái tải.
   const focusedKeyRef = useRef<string | null>(null);
   useFocusEffect(
@@ -358,7 +358,7 @@ export default function RecipeDetailScreen() {
     });
   };
 
-  // UC-09 / UC-11: cập nhật lạc quan, hoàn tác và báo toast khi lỗi.
+  // Lưu / bỏ lưu yêu thích: cập nhật lạc quan, hoàn tác và báo toast khi lỗi.
   // Cache được ghi/xoá bên trong cacheManager, chỉ sau khi server đã nhận.
   const toggleFavorite = async () => {
     if (!data || !favorite || favoritePendingRef.current) return;
@@ -440,7 +440,7 @@ export default function RecipeDetailScreen() {
           title="Không tìm thấy công thức"
           message="Công thức có thể đã bị xóa hoặc không còn được chia sẻ. Hãy tìm một món ngon khác nhé."
           actionTitle="Tìm công thức khác"
-          // Chưa có màn tìm kiếm (UC-06/UC-07), tạm đưa về tab chính.
+          // Chưa nối sang màn tìm kiếm, tạm đưa về tab chính.
           onAction={() => router.replace('/(app)/(tabs)')}
           onBack={() => router.back()}
         />
@@ -545,7 +545,7 @@ function RecipeBody({
 
   return (
     <ScrollView contentContainerStyle={styles.scroll}>
-      {/* Frame 2041:25924: đang xem bản lưu ngoại tuyến của công thức yêu thích. */}
+      {/* Đang xem bản lưu ngoại tuyến của công thức yêu thích. */}
       {isCached ? <Notice variant="success" message="Bạn đang xem bản đã lưu trên máy" /> : null}
 
       {recipe.imageUrl ? (
@@ -559,7 +559,7 @@ function RecipeBody({
           <View style={styles.sourceChip}>
             <Text style={styles.sourceChipText}>{SOURCE_LABEL[recipe.source]}</Text>
           </View>
-          {/* UC-09 / UC-11: lưu và bỏ lưu yêu thích. Khi bị chặn (thiếu favorite_id)
+          {/* Lưu và bỏ lưu yêu thích. Khi bị chặn (thiếu favorite_id)
               vẫn cho bấm để toast giải thích lý do. */}
           <Pressable
             onPress={onToggleFavorite}
@@ -580,7 +580,7 @@ function RecipeBody({
         {authorName || rating ? (
           <View style={styles.metaRow}>
             <Text style={styles.author}>{authorName ? `Bếp của ${authorName}` : ''}</Text>
-            {/* rating chưa có trong response (backend chưa làm B2) thì ẩn hẳn dòng sao. */}
+            {/* Response không có rating (bản backend cũ) thì ẩn hẳn dòng sao. */}
             {rating ? (
               <Text style={styles.rating}>
                 {rating.count > 0
@@ -748,7 +748,7 @@ function RecipeBody({
           <Text style={styles.reviewEmpty}>Chưa có đánh giá nào, hãy là người đầu tiên!</Text>
         )}
 
-        {/* Đánh giá nổi bật (frame 2003:10943): tên và sao ở dòng đầu, nhận xét ở dòng sau. */}
+        {/* Đánh giá nổi bật: tên và sao ở dòng đầu, nhận xét ở dòng sau. */}
         {featuredReview ? (
           <View style={styles.featuredCard}>
             <Text
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   loadingText: { fontFamily: fonts.regular, fontSize: fontSize.xs, color: colors.textMid },
 
-  // Nút cần mạng khi xem bản lưu (frame 2041:25924): nút mờ 40%, chú thích ngay dưới.
+  // Nút cần mạng khi xem bản lưu: nút mờ 40%, chú thích ngay dưới.
   networkAction: { gap: 7 },
   needNetwork: {
     fontFamily: fonts.regular,

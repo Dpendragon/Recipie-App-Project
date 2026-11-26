@@ -22,9 +22,8 @@ import type { RecipeSource } from '@/types/recipe.types';
 import type { Review, ReviewSummary, UpsertReviewRequest } from '@/types/review.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 
-// UC-12 gửi đánh giá, UC-13 xem danh sách, UC-15 sửa, UC-16 xoá.
-// Frame: 2003:10768 (form + tổng quan), 2003:9171 (đã đánh giá),
-// 2003:9237 (chưa đánh giá), 2020:1028 (hộp xoá), 2075:1506 (toast).
+// Màn đánh giá của một công thức: gửi, xem danh sách, sửa và xoá đánh giá.
+// Gồm form + tổng quan, trạng thái đã/chưa đánh giá, hộp xác nhận xoá và toast.
 
 type Phase = 'loading' | 'ready' | 'error';
 
@@ -180,7 +179,7 @@ export default function RecipeReviewsScreen() {
     }
   };
 
-  // UC-15: "Sửa" mở form ở chế độ cập nhật và điền sẵn đánh giá hiện tại.
+  // "Sửa" mở form ở chế độ cập nhật và điền sẵn đánh giá hiện tại.
   const startEdit = () => {
     if (!mine) return;
     setRating(mine.rating);
@@ -203,7 +202,7 @@ export default function RecipeReviewsScreen() {
     setRatingError(null);
   };
 
-  // UC-12 / UC-15 dùng chung một endpoint upsert, POST trả { review, summary }
+  // Gửi mới và sửa dùng chung một endpoint upsert, POST trả { review, summary }
   // nên cập nhật tổng quan và "Đánh giá của bạn" ngay, không tải lại danh sách.
   const submit = async () => {
     if (!id || submitting) return;
@@ -250,7 +249,7 @@ export default function RecipeReviewsScreen() {
     }
   };
 
-  // UC-16: 204 là đã xoá; 404 nghĩa là không còn gì để xoá (có thể đã xoá từ
+  // Xoá: 204 là đã xoá; 404 nghĩa là không còn gì để xoá (có thể đã xoá từ
   // thiết bị khác) nên cũng coi như xoá xong. Cả hai nhánh tải lại tổng quan.
   const confirmDelete = async () => {
     if (!id || deleting) return;
