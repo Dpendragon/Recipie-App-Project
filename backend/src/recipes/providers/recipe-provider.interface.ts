@@ -62,8 +62,9 @@ export type RecipeDetail = {
   imageUrl: string | null;
   servings: number;
   readyInMinutes: number | null;
-  diets: string[] | null;
-  dishTypes: string[] | null;
+  // Hai cột JSON của UC-07, luôn là mảng: cột NULL trả về mảng rỗng.
+  diets: string[];
+  dishTypes: string[];
   steps: string[];
   videoUrl: string | null;
   ingredients: RecipeIngredientDetail[];

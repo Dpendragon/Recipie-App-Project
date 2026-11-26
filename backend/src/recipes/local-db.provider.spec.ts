@@ -126,7 +126,7 @@ describe('LocalDbProvider', () => {
     },
   );
 
-  it('trả null khi diets/dishTypes không phải mảng chuỗi', async () => {
+  it('trả mảng rỗng khi diets/dishTypes không phải mảng chuỗi', async () => {
     prismaMock.recipe.findUnique.mockResolvedValue({
       ...recipeRow,
       diets: { a: 1 },
@@ -135,8 +135,21 @@ describe('LocalDbProvider', () => {
 
     const result = await provider.getById('1');
 
-    expect(result.diets).toBeNull();
-    expect(result.dishTypes).toBeNull();
+    expect(result.diets).toEqual([]);
+    expect(result.dishTypes).toEqual([]);
+  });
+
+  it('trả mảng rỗng khi cột diets/dishTypes là NULL', async () => {
+    prismaMock.recipe.findUnique.mockResolvedValue({
+      ...recipeRow,
+      diets: null,
+      dishTypes: null,
+    });
+
+    const result = await provider.getById('1');
+
+    expect(result.diets).toEqual([]);
+    expect(result.dishTypes).toEqual([]);
   });
 
   describe('author', () => {

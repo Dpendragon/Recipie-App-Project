@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMaxSize,
   ArrayMinSize,
   IsArray,
   IsInt,
@@ -73,14 +74,20 @@ export class CreateRecipeDto {
   @Min(1, { message: 'Thời gian nấu phải từ 1 phút trở lên' })
   readyInMinutes?: number;
 
+  // Hai cột JSON của UC-07. Không chốt danh sách trắng: màn lọc tìm kiếm có
+  // thể dùng thêm giá trị ngoài danh sách gợi ý của form, chỉ chặn kích thước.
   @IsOptional()
   @IsArray({ message: 'Chế độ ăn phải là danh sách' })
+  @ArrayMaxSize(10, { message: 'Chế độ ăn tối đa 10 mục' })
   @IsString({ each: true, message: 'Chế độ ăn không hợp lệ' })
+  @MaxLength(50, { each: true, message: 'Mỗi chế độ ăn tối đa 50 ký tự' })
   diets?: string[];
 
   @IsOptional()
   @IsArray({ message: 'Loại món phải là danh sách' })
+  @ArrayMaxSize(10, { message: 'Loại món tối đa 10 mục' })
   @IsString({ each: true, message: 'Loại món không hợp lệ' })
+  @MaxLength(50, { each: true, message: 'Mỗi loại món tối đa 50 ký tự' })
   dishTypes?: string[];
 
   @Transform(trimLines)

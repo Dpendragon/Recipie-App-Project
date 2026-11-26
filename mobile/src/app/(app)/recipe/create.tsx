@@ -48,6 +48,8 @@ export default function CreateRecipeScreen() {
       title: value.title,
       servings: value.servings,
       steps: value.steps,
+      diets: value.diets,
+      dishTypes: value.dishTypes,
       ingredients: value.ingredients,
     };
     if (value.readyInMinutes !== null) body.readyInMinutes = value.readyInMinutes;

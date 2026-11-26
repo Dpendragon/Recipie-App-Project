@@ -5,8 +5,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { ActionButton } from '@/components/common/ActionButton';
 import { Icon } from '@/components/common/Icon';
 import { Notice } from '@/components/common/Notice';
+import { TagChips } from '@/components/recipe/TagChips';
 import { icons } from '@/constants/assets';
 import { extraColors } from '@/constants/layout';
+import { DIET_TAGS, DISH_TYPE_TAGS } from '@/constants/recipeTags';
 import { colors, fonts, radius } from '@/constants/theme';
 import { autocomplete } from '@/services/api/ingredientApi';
 import { uploadImage } from '@/services/api/mediaApi';
@@ -36,6 +38,9 @@ export type RecipeFormValue = {
   ingredients: IngredientDraft[];
   steps: StepDraft[];
   videoUrl: string;
+  // Chế độ ăn và loại món đã chọn (value tiếng Anh, xem constants/recipeTags).
+  diets: string[];
+  dishTypes: string[];
   // Ảnh đã lưu trên server (chế độ sửa); null khi công thức chưa có ảnh.
   imageUrl: string | null;
 };
@@ -48,6 +53,9 @@ export type RecipeFormSubmit = {
   readyInMinutes: number | null;
   steps: string[];
   videoUrl: string | null;
+  // Không chọn gì thì là mảng rỗng: cả hai trường đều không bắt buộc (UC-07).
+  diets: string[];
+  dishTypes: string[];
   ingredients: RecipeIngredientInput[];
   // undefined: giữ nguyên ảnh cũ (không chọn ảnh mới, hoặc upload thất bại).
   // string: ảnh vừa tải lên. null: người dùng đã bấm "Gỡ ảnh".
@@ -129,6 +137,8 @@ export function createEmptyRecipeForm(): RecipeFormValue {
     ingredients: [emptyIngredient()],
     steps: [emptyStep()],
     videoUrl: '',
+    diets: [],
+    dishTypes: [],
     imageUrl: null,
   };
 }
@@ -194,6 +204,16 @@ export function RecipeForm({
     setValue((current) => ({
       ...current,
       ingredients: current.ingredients.filter((row) => row.key !== key),
+    }));
+  };
+
+  // Chạm chip để chọn hoặc bỏ chọn; giữ nguyên thứ tự trong constants/recipeTags.
+  const toggleTag = (field: 'diets' | 'dishTypes', tag: string) => {
+    setValue((current) => ({
+      ...current,
+      [field]: current[field].includes(tag)
+        ? current[field].filter((item) => item !== tag)
+        : [...current[field], tag],
     }));
   };
 
@@ -359,6 +379,8 @@ export function RecipeForm({
       readyInMinutes: minutes,
       steps,
       videoUrl: videoUrl || null,
+      diets: value.diets,
+      dishTypes: value.dishTypes,
       ingredients,
       imageUrl: image.imageUrl,
       imageUploadFailed: image.uploadFailed,
@@ -601,6 +623,27 @@ export function RecipeForm({
           <Icon icon={icons.formLink} />
         </View>
         {errors.videoUrl ? <FieldError message={errors.videoUrl} /> : null}
+      </View>
+
+      {/* Hai nhóm chip không bắt buộc, để UC-07 lọc được công thức LOCAL. */}
+      <View style={faded}>
+        <TagChips
+          label="Chế độ ăn"
+          options={DIET_TAGS}
+          selected={value.diets}
+          disabled={busy}
+          onToggle={(tag) => toggleTag('diets', tag)}
+        />
+      </View>
+
+      <View style={faded}>
+        <TagChips
+          label="Loại món"
+          options={DISH_TYPE_TAGS}
+          selected={value.dishTypes}
+          disabled={busy}
+          onToggle={(tag) => toggleTag('dishTypes', tag)}
+        />
       </View>
 
       <Notice

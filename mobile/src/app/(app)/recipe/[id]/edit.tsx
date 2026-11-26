@@ -67,6 +67,8 @@ function toFormValue(recipe: RecipeDetail): RecipeFormValue {
     ingredients: ingredients.length > 0 ? ingredients : [emptyIngredient()],
     steps: steps.length > 0 ? steps : [emptyStep()],
     videoUrl: recipe.videoUrl ?? '',
+    diets: recipe.diets ?? [],
+    dishTypes: recipe.dishTypes ?? [],
     imageUrl: recipe.imageUrl,
   };
 }
@@ -156,6 +158,8 @@ export default function EditRecipeScreen() {
       readyInMinutes: value.readyInMinutes,
       steps: value.steps,
       videoUrl: value.videoUrl,
+      diets: value.diets,
+      dishTypes: value.dishTypes,
       ingredients: value.ingredients,
     };
     // Chỉ gửi imageUrl khi ảnh thực sự đổi: chuỗi là ảnh mới vừa upload, null

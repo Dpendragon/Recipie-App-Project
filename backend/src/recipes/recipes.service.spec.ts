@@ -117,6 +117,50 @@ describe('CreateRecipeDto', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0].property).toBe('ingredients');
   });
+
+  describe('diets và dishTypes (UC-07)', () => {
+    it('chấp nhận mảng rỗng và giá trị ngoài danh sách gợi ý của form', () => {
+      expect(
+        errorsFor(createPayload({ diets: [], dishTypes: ['bread'] })),
+      ).toHaveLength(0);
+    });
+
+    it.each(['diets', 'dishTypes'])('từ chối %s không phải mảng', (field) => {
+      const errors = errorsFor(createPayload({ [field]: 'vegetarian' }));
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe(field);
+    });
+
+    it.each(['diets', 'dishTypes'])(
+      'từ chối %s có phần tử không phải chuỗi',
+      (field) => {
+        const errors = errorsFor(createPayload({ [field]: [1] }));
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0].property).toBe(field);
+      },
+    );
+
+    it.each(['diets', 'dishTypes'])('từ chối %s quá 10 mục', (field) => {
+      const errors = errorsFor(
+        createPayload({ [field]: Array.from({ length: 11 }, (_, i) => `t${i}`) }),
+      );
+
+      expect(errors).toHaveLength(1);
+      expect(errors[0].property).toBe(field);
+    });
+
+    it.each(['diets', 'dishTypes'])(
+      'từ chối %s có phần tử quá 50 ký tự',
+      (field) => {
+        const errors = errorsFor(createPayload({ [field]: ['a'.repeat(51)] }));
+
+        expect(errors).toHaveLength(1);
+        expect(errors[0].property).toBe(field);
+      },
+    );
+  });
 });
 
 describe('UpdateRecipeDto', () => {
@@ -413,8 +457,8 @@ describe('RecipesService', () => {
         imageUrl: null,
         servings: 2,
         readyInMinutes: null,
-        diets: null,
-        dishTypes: null,
+        diets: [],
+        dishTypes: [],
         // steps được tách lại thành string[] giống GET /recipes/:id.
         steps: ['Ninh xương', 'Chan nước dùng'],
         videoUrl: null,
