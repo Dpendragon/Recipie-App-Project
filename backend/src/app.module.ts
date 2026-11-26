@@ -6,20 +6,26 @@ import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './auth/auth.module';
 import { RecipesModule } from './recipes/recipes.module';
 import { IngredientsModule } from './ingredients/ingredients.module';
+import { NutritionModule } from './nutrition/nutrition.module';
+import { ReviewsModule } from './reviews/reviews.module';
+import { FavoritesModule } from './favorites/favorites.module';
+import { MediaModule } from './media/media.module';
 import { ShoppingItemsModule } from './shopping-items/shopping-items.module';
 import { MealPlanModule } from './meal-plan/meal-plan.module';
-import { FavoritesModule } from './favorites/favorites.module';
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
     AuthModule,
-    IngredientsModule,
     RecipesModule,
+    IngredientsModule,
+    NutritionModule,
+    ReviewsModule,
+    FavoritesModule,
+    MediaModule,
     ShoppingItemsModule,
     MealPlanModule,
-    FavoritesModule,
   ],
   controllers: [AppController],
   providers: [AppService],

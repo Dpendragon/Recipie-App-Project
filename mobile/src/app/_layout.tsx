@@ -16,6 +16,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SessionCheckScreen } from '@/components/auth/SessionCheckScreen';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { NetworkProvider } from '@/contexts/NetworkContext';
 import { useAuth } from '@/hooks/useAuth';
 import { SplashScreenController } from '@/splash';
 import { colors, fonts, radius } from '@/constants/theme';
@@ -40,10 +41,12 @@ export default function RootLayout() {
   // dòng mua sắm) hoạt động.
   return (
     <GestureHandlerRootView style={styles.root}>
-      <AuthProvider>
-        <SplashScreenController />
-        <RootNavigator />
-      </AuthProvider>
+      <NetworkProvider>
+        <AuthProvider>
+          <SplashScreenController />
+          <RootNavigator />
+        </AuthProvider>
+      </NetworkProvider>
     </GestureHandlerRootView>
   );
 }

@@ -25,19 +25,19 @@ type AuthUser = { id: number };
 export class MealPlanController {
   constructor(private readonly mealPlanService: MealPlanService) {}
 
-  // GET /meal-plan?from=YYYY-MM-DD&to=YYYY-MM-DD (UC-22)
+  // GET /meal-plan?from=YYYY-MM-DD&to=YYYY-MM-DD — xem kế hoạch theo tuần
   @Get()
   findRange(@CurrentUser() user: AuthUser, @Query() query: MealPlanQueryDto) {
     return this.mealPlanService.findRange(user.id, query.from, query.to);
   }
 
-  // POST /meal-plan (UC-21)
+  // POST /meal-plan — thêm món vào một buổi
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateMealPlanDto) {
     return this.mealPlanService.create(user.id, dto);
   }
 
-  // PATCH /meal-plan/:id — đổi món (UC-23)
+  // PATCH /meal-plan/:id — đổi món
   @Patch(':id')
   update(
     @CurrentUser() user: AuthUser,
@@ -47,7 +47,7 @@ export class MealPlanController {
     return this.mealPlanService.update(user.id, id, dto);
   }
 
-  // DELETE /meal-plan/:id (UC-24) — 204 khi xoá thành công
+  // DELETE /meal-plan/:id — 204 khi xoá thành công
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {

@@ -11,7 +11,7 @@ export async function getShoppingItems(): Promise<ShoppingItem[]> {
   return data;
 }
 
-// POST /shopping-items — thêm tay vào khu vực "Của tôi" (UC-25)
+// POST /shopping-items — thêm tay vào khu vực "Của tôi"
 export async function createShoppingItem(
   body: CreateShoppingItemRequest,
 ): Promise<ShoppingItem> {
@@ -19,7 +19,7 @@ export async function createShoppingItem(
   return data;
 }
 
-// PATCH /shopping-items/:id — đánh dấu đã mua (UC-27) hoặc sửa ghi chú (UC-28)
+// PATCH /shopping-items/:id — đánh dấu đã mua hoặc sửa ghi chú
 export async function updateShoppingItem(
   id: number,
   body: UpdateShoppingItemRequest,
@@ -28,7 +28,7 @@ export async function updateShoppingItem(
   return data;
 }
 
-// DELETE /shopping-items/:id — 204 kể cả khi dòng đã bị xoá trước đó (UC-29)
+// DELETE /shopping-items/:id — 204 kể cả khi dòng đã bị xoá trước đó
 export async function deleteShoppingItem(id: number): Promise<void> {
   await apiClient.delete(`/shopping-items/${id}`);
 }

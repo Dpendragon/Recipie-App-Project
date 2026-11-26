@@ -12,7 +12,7 @@ import { RecipeSource } from '../../generated/prisma/enums';
 const trimOrUndefined = ({ value }: { value: unknown }) =>
   typeof value === 'string' ? value.trim() || undefined : value;
 
-// ĐỔI MÓN (UC-23): chỉ thay công thức, ngày và buổi ăn giữ nguyên.
+// Đổi món: chỉ thay công thức, ngày và buổi ăn giữ nguyên.
 // Các trường khác (vd date, mealSlot) bị ValidationPipe (whitelist: true) loại bỏ.
 export class UpdateMealPlanDto {
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))

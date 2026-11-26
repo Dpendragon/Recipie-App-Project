@@ -16,9 +16,9 @@ type Props = {
   caption?: string | null;
   captionTone?: 'muted' | 'accent';
   onToggle: () => void;
-  // Bấm vào dòng hoặc nút ⋮ để mở phần sửa ghi chú (UC-28).
+  // Bấm vào dòng hoặc nút ⋮ để mở phần sửa ghi chú.
   onOpen: () => void;
-  // Vuốt trái rồi bấm thùng rác để xoá (UC-29).
+  // Vuốt trái rồi bấm thùng rác để xoá.
   onDelete: () => void;
 };
 

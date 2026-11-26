@@ -17,7 +17,7 @@ type Props = {
   onCancel: () => void;
 };
 
-// Phần mở rộng dưới 1 dòng để nhập / sửa ghi chú (UC-28).
+// Phần mở rộng dưới 1 dòng để nhập / sửa ghi chú.
 export function NoteEditor({ item, groupLabel, onSave, onDelete, onCancel }: Props) {
   const [note, setNote] = useState(item.note ?? '');
   const [saving, setSaving] = useState(false);

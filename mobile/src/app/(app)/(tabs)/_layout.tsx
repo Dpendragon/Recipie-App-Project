@@ -5,13 +5,13 @@ import { appColors } from '@/constants/theme';
 
 export default function TabsLayout() {
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs screenOptions={{ headerShown: false, tabBarActiveTintColor: appColors.primary }}>
       <Tabs.Screen name="index" options={{ title: 'Trang chủ' }} />
+      <Tabs.Screen name="favorites" options={{ title: 'Yêu thích' }} />
       <Tabs.Screen
         name="meal-plan"
         options={{
           title: 'Kế hoạch',
-          tabBarActiveTintColor: appColors.primary,
           tabBarIcon: ({ focused }) => (
             <Icon icon={focused ? icons.tabCalendarActive : icons.tabCalendar} />
           ),
@@ -21,7 +21,6 @@ export default function TabsLayout() {
         name="shopping"
         options={{
           title: 'Mua sắm',
-          tabBarActiveTintColor: appColors.primary,
           tabBarIcon: ({ focused }) => (
             <Icon icon={focused ? icons.tabBasketActive : icons.tabBasket} />
           ),

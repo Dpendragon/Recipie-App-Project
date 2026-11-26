@@ -34,7 +34,14 @@
         }
       ],
       "expo-secure-store",
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ứng dụng cần truy cập thư viện ảnh để bạn chọn ảnh món ăn cho công thức.",
+          "cameraPermission": "Ứng dụng cần dùng máy ảnh để bạn chụp ảnh món ăn cho công thức."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

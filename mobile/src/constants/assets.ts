@@ -26,6 +26,47 @@ export const icons = {
   mailCheck: icon(require('../../assets/icons/ac-mail-check.svg'), 18, 18),
   mailCheckRed: icon(require('../../assets/icons/ac-mail-check-red.svg'), 18, 18),
 
+  // Chi tiết công thức
+  clock: icon(require('../../assets/icons/rd-clock.svg'), 21, 21), // thời gian nấu
+  users: icon(require('../../assets/icons/rd-users.svg'), 21, 21), // số khẩu phần
+  flame: icon(require('../../assets/icons/rd-flame.svg'), 21, 21), // năng lượng (kcal)
+  recipeNotFound: icon(require('../../assets/icons/rd-not-found.svg'), 34, 34),
+  recipeOffline: icon(require('../../assets/icons/rd-offline.svg'), 34, 34),
+  detailHeart: icon(require('../../assets/icons/rd-heart.svg'), 20, 20), // nút Yêu thích
+  ingredientCheck: icon(require('../../assets/icons/rd-circle-check.svg'), 17, 17), // nguyên liệu đã có
+  circlePlus: icon(require('../../assets/icons/rd-circle-plus.svg'), 17, 17), // nguyên liệu cần mua
+  cart: icon(require('../../assets/icons/rd-cart.svg'), 19, 19), // thêm vào danh sách mua sắm
+  calendar: icon(require('../../assets/icons/rd-calendar.svg'), 19, 19), // thêm vào kế hoạch bữa ăn
+  play: icon(require('../../assets/icons/rd-play.svg'), 22, 22), // nút phát video
+
+  // Yêu thích
+  heartCard: icon(require('../../assets/icons/fv-heart-card.svg'), 18, 18), // nút tim trên ảnh thẻ
+  heartEmpty: icon(require('../../assets/icons/fv-heart-empty.svg'), 34, 34), // minh hoạ danh sách rỗng
+  wifiOff: icon(require('../../assets/icons/fv-wifi-off.svg'), 18, 18), // banner đang ngoại tuyến
+  cloudOff: icon(require('../../assets/icons/fv-cloud-off.svg'), 18, 18), // banner cần mạng để dùng thêm
+  toastCheck: icon(require('../../assets/icons/fv-toast-check.svg'), 19, 19), // dấu tick trên toast
+  calendarGreen: icon(require('../../assets/icons/fv-calendar.svg'), 19, 19), // nút phụ "Thêm món vào kế hoạch"
+
+  // Đánh giá
+  starOutline: icon(require('../../assets/icons/rv-star-outline.svg'), 35, 35), // sao chưa chọn
+  starFilled: icon(require('../../assets/icons/rv-star-filled.svg'), 35, 35), // sao đã chọn
+
+  // Đăng và sửa công thức. Bản 19px màu xám của clock-3 và
+  // users-round: rd-clock, rd-users là cùng hình nhưng 21px màu xanh của màn chi tiết.
+  formServings: icon(require('../../assets/icons/rf-users.svg'), 19, 19), // ô "Số người ăn"
+  formMinutes: icon(require('../../assets/icons/rf-clock.svg'), 19, 19), // ô "Thời gian (phút)"
+  formLink: icon(require('../../assets/icons/rf-link.svg'), 19, 19), // ô "Liên kết video"
+  formTrash: icon(require('../../assets/icons/rf-trash.svg'), 16, 16), // xoá nguyên liệu, xoá bước
+  formPlus: icon(require('../../assets/icons/rf-plus.svg'), 19, 19), // nút thêm nguyên liệu, thêm bước
+  formPencil: icon(require('../../assets/icons/rf-pencil.svg'), 18, 18), // banner "Đang sửa món đã đăng"
+  formSalad: icon(require('../../assets/icons/rf-salad.svg'), 18, 18), // banner ghi chú dinh dưỡng
+
+  // Công thức của tôi. Cùng hình notebook-pen nhưng hai bản khác
+  // nét: 18px cho banner ghi chú, 34px (nét 1.5) cho minh hoạ danh sách rỗng.
+  notebookPen: icon(require('../../assets/icons/mr-notebook-pen.svg'), 18, 18),
+  notebookPenEmpty: icon(require('../../assets/icons/mr-notebook-pen-lg.svg'), 34, 34),
+
+
   search: icon(require('../../assets/icons/se-search.svg'), 20, 20),
   searchWhite: icon(require('../../assets/icons/se-search-white.svg'), 19, 19), 
   searchLarge: icon(require('../../assets/icons/se-search-large.svg'), 34, 34), 

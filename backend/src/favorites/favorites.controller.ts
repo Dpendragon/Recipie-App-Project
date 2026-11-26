@@ -11,31 +11,31 @@ import {
   Query,
 } from '@nestjs/common';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { PaginationQueryDto } from '../common/dto/pagination.dto';
 import { CreateFavoriteDto } from './dto/create-favorite.dto';
-import { FavoritesQueryDto } from './dto/favorites-query.dto';
 import { FavoritesService } from './favorites.service';
 
-// Kiểu tối thiểu của req.user (do JwtStrategy.validate() trả về).
+// req.user do JwtStrategy.validate() gán (users trừ passwordHash).
 type AuthUser = { id: number };
 
-// Tất cả route ở đây đều cần JWT (JwtAuthGuard là guard toàn cục).
 @Controller('favorites')
 export class FavoritesController {
   constructor(private readonly favoritesService: FavoritesService) {}
 
-  // GET /favorites?cursor=&limit= (UC-10) — trả { data, meta: { nextCursor, hasMore } }
+  // GET /favorites?cursor=&limit= — danh sách yêu thích
   @Get()
-  findAll(@CurrentUser() user: AuthUser, @Query() query: FavoritesQueryDto) {
-    return this.favoritesService.findAll(user.id, query.cursor, query.limit);
+  list(@CurrentUser() user: AuthUser, @Query() query: PaginationQueryDto) {
+    return this.favoritesService.list(user.id, query);
   }
 
-  // POST /favorites (UC-09)
+  // POST /favorites — lưu yêu thích
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateFavoriteDto) {
     return this.favoritesService.create(user.id, dto);
   }
 
-  // DELETE /favorites/:id (UC-11) — luôn trả 204, kể cả khi đã bỏ lưu từ trước
+  // DELETE /favorites/:id — bỏ lưu. :id là id của dòng favorites, không phải
+  // recipe_id, nên ép kiểu số được ngay ở đây.
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   remove(@CurrentUser() user: AuthUser, @Param('id', ParseIntPipe) id: number) {

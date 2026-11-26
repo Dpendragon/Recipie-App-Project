@@ -50,7 +50,7 @@ type RecipeDisplay = { title: string | null; imageUrl: string | null };
 export class MealPlanService {
   constructor(private readonly prisma: PrismaService) {}
 
-  // XEM KẾ HOẠCH (UC-22)
+  // Xem kế hoạch trong khoảng ngày
   async findRange(userId: number, from: string, to: string) {
     const fromDate = parseDateOnly(from, 'from');
     const toDate = parseDateOnly(to, 'to');
@@ -78,7 +78,7 @@ export class MealPlanService {
     });
 
     // LOCAL: ưu tiên dữ liệu sống trong bảng recipes, công thức đã bị xoá thì
-    // rơi về snapshot (tương đương LEFT JOIN + COALESCE ở Mục 2).
+    // rơi về snapshot (tương đương LEFT JOIN + COALESCE).
     // recipe_id là VARCHAR nên không JOIN được qua Prisma -> lấy gộp 1 truy vấn.
     const localIds = [
       ...new Set(
@@ -109,7 +109,7 @@ export class MealPlanService {
     );
   }
 
-  // THÊM MÓN (UC-21) — luôn tạo dòng mới, 1 buổi có thể có nhiều món.
+  // Thêm món — luôn tạo dòng mới, 1 buổi có thể có nhiều món.
   async create(userId: number, dto: CreateMealPlanDto) {
     const date = parseDateOnly(dto.date, 'Ngày');
     const snapshot = await this.resolveSnapshot(dto);
@@ -129,7 +129,7 @@ export class MealPlanService {
     return toResponse(entry);
   }
 
-  // ĐỔI MÓN (UC-23) — chỉ sửa đúng dòng id, các món khác cùng buổi giữ nguyên.
+  // Đổi món — chỉ sửa đúng dòng id, các món khác cùng buổi giữ nguyên.
   async update(userId: number, id: number, dto: UpdateMealPlanDto) {
     await this.assertOwner(userId, id);
     const snapshot = await this.resolveSnapshot(dto);
@@ -146,13 +146,13 @@ export class MealPlanService {
     return toResponse(entry);
   }
 
-  // XOÁ MÓN (UC-24) — chỉ xoá đúng dòng id.
+  // Xoá món — chỉ xoá đúng dòng id.
   async remove(userId: number, id: number) {
     await this.assertOwner(userId, id);
     await this.prisma.mealPlanEntry.delete({ where: { id } });
   }
 
-  // Không có -> 404; có nhưng của người khác -> 403 (theo ghi chú Mục 8).
+  // Không có -> 404; có nhưng của người khác -> 403.
   private async assertOwner(userId: number, id: number) {
     const existing = await this.prisma.mealPlanEntry.findUnique({
       where: { id },
@@ -168,7 +168,7 @@ export class MealPlanService {
     }
   }
 
-  // Snapshot được ghi cho MỌI nguồn lúc tạo/đổi món (Mục 2):
+  // Snapshot được ghi cho mọi nguồn lúc tạo/đổi món:
   // - LOCAL: lấy từ bảng recipes (bỏ qua giá trị client gửi).
   // - SPOONACULAR: dùng giá trị client gửi, bắt buộc có titleSnapshot.
   private async resolveSnapshot(dto: UpdateMealPlanDto) {

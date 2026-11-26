@@ -16,7 +16,7 @@ export type MealPlanEntry = {
   updatedAt: string;
 };
 
-// Thông tin công thức gửi lên khi thêm (UC-21) hoặc đổi món (UC-23).
+// Thông tin công thức gửi lên khi thêm hoặc đổi món.
 // Snapshot chỉ bắt buộc với SPOONACULAR; LOCAL thì server tự lấy.
 export type MealRecipeRequest = {
   recipeId: string;

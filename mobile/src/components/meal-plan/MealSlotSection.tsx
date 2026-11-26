@@ -23,7 +23,7 @@ type Props = {
   onAdd: () => void;
 };
 
-// 1 buổi ăn: danh sách các món đã gán + luôn có nút "Thêm món" (UC-22).
+// 1 buổi ăn: danh sách các món đã gán + luôn có nút "Thêm món".
 export function MealSlotSection({ slot, entries, onEntryPress, onAdd }: Props) {
   const label = MEAL_SLOT_LABELS[slot].title;
 

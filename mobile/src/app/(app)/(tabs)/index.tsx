@@ -1,4 +1,4 @@
-import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { BrandLogo } from '@/components/auth/BrandLogo';
@@ -12,25 +12,14 @@ import { RecipeCard } from '@/components/recipe/RecipeCard';
 import { RecipeCardSkeleton } from '@/components/recipe/RecipeCardSkeleton';
 import { icons } from '@/constants/assets';
 import { colors, fonts } from '@/constants/theme';
-import { useAuth } from '@/hooks/useAuth';
 import { useHomeFeed } from '@/hooks/useHomeFeed';
 import { useSearch } from '@/hooks/useSearch';
-import { showComingSoon } from '@/utils/helpers';
 
 // Trang chủ (tab Khám phá): ô tìm tên món, thẻ "Bếp bạn đang có gì?" và "Món nổi tiếng".
 export default function HomeScreen() {
   const router = useRouter();
-  const { signOut } = useAuth();
   const { ingredients } = useSearch(); 
   const { popular, status, error, reload } = useHomeFeed();
-
-  // TẠM THỜI: bấm vào hình tròn góc phải để đăng xuất
-  function confirmSignOut() {
-    Alert.alert('Đăng xuất', 'Bạn có muốn đăng xuất khỏi Recipe App?', [
-      { text: 'Huỷ', style: 'cancel' },
-      { text: 'Đăng xuất', style: 'destructive', onPress: () => signOut() },
-    ]);
-  }
 
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
@@ -39,9 +28,9 @@ export default function HomeScreen() {
         <View style={styles.topRow}>
           <BrandLogo size={22} />
           <Pressable
-            onPress={confirmSignOut}
+            onPress={() => router.push('/account')}
             accessibilityRole="button"
-            accessibilityLabel="Tài khoản, đăng xuất"
+            accessibilityLabel="Tài khoản"
             style={styles.avatar}
           >
             <Icon icon={icons.user} />
@@ -87,7 +76,12 @@ export default function HomeScreen() {
                   key={`${recipe.source}:${recipe.id}`}
                   recipe={recipe}
                   variant="carousel"
-                  onPress={() => showComingSoon('Xem chi tiết công thức')}
+                  onPress={() =>
+                    router.push({
+                      pathname: '/recipe/[id]',
+                      params: { id: recipe.id, source: recipe.source },
+                    })
+                  }
                 />
               ))}
             </HorizontalList>

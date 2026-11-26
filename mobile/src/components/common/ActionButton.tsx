@@ -1,19 +1,24 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text } from 'react-native';
-import { appColors, appFonts, appRadius } from '@/constants/theme';
 import type { IconAsset } from '@/constants/assets';
+import { extraColors, spacing } from '@/constants/layout';
+import { colors, fonts, radius } from '@/constants/theme';
 import { Icon } from './Icon';
 
 type Props = {
   title: string;
   onPress: () => void;
-  // Theo component "Nút" trong Figma: Chính (nền xanh) / Phụ (nền xanh nhạt).
-  variant?: 'primary' | 'secondary';
+  // 'danger': kiểu nút "Xóa" (vd nút "Xóa đánh giá" trong hộp xác nhận).
+  variant?: 'primary' | 'secondary' | 'danger';
   icon?: IconAsset;
+  // Đang gửi request: hiện vòng quay thay cho chữ và chặn bấm lại.
   loading?: boolean;
+  // Nút cần mạng khi đang xem bản lưu ngoại tuyến: mờ 40%.
   disabled?: boolean;
 };
 
-// Nút hành động của bộ thiết kế tông xanh (cao 52, bo tròn hoàn toàn).
+// Nút hành động theo thiết kế: cao 52, bo tròn, chữ 14, gap 9.
+// Không dùng components/common/Button vì nút đó đang dùng chữ 15 và chỉ có biến
+// thể viền trắng, còn các màn công thức cần cả biến thể nền xanh nhạt.
 export function ActionButton({
   title,
   onPress,
@@ -24,6 +29,11 @@ export function ActionButton({
 }: Props) {
   const isPrimary = variant === 'primary';
   const inactive = disabled || loading;
+  const textColor = isPrimary
+    ? styles.textPrimary
+    : variant === 'danger'
+      ? styles.textDanger
+      : styles.textSecondary;
 
   return (
     <Pressable
@@ -32,20 +42,17 @@ export function ActionButton({
       accessibilityRole="button"
       accessibilityState={{ disabled: inactive, busy: loading }}
       style={({ pressed }) => [
-        styles.base,
-        isPrimary ? styles.primary : styles.secondary,
-        inactive ? styles.inactive : null,
-        pressed ? styles.pressed : null,
+        styles.button,
+        isPrimary ? styles.primary : variant === 'danger' ? styles.danger : styles.secondary,
+        disabled ? styles.disabled : pressed ? styles.pressed : null,
       ]}
     >
       {loading ? (
-        <ActivityIndicator color={isPrimary ? appColors.white : appColors.primary} />
+        <ActivityIndicator color={isPrimary ? colors.white : colors.primary} />
       ) : (
         <>
           {icon ? <Icon icon={icon} /> : null}
-          <Text style={[styles.text, isPrimary ? styles.textPrimary : styles.textSecondary]}>
-            {title}
-          </Text>
+          <Text style={[styles.text, textColor]}>{title}</Text>
         </>
       )}
     </Pressable>
@@ -53,21 +60,22 @@ export function ActionButton({
 }
 
 const styles = StyleSheet.create({
-  base: {
-    height: 52,
-    alignSelf: 'stretch',
-    borderRadius: appRadius.pill,
-    paddingHorizontal: 16,
+  button: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 9,
+    height: 52,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.pill,
   },
-  primary: { backgroundColor: appColors.primary },
-  secondary: { backgroundColor: appColors.primarySoft },
-  inactive: { opacity: 0.55 },
+  primary: { backgroundColor: colors.primary },
+  secondary: { backgroundColor: colors.softGreen },
+  danger: { backgroundColor: extraColors.dangerBg },
   pressed: { opacity: 0.85 },
-  text: { fontFamily: appFonts.semiBold, fontSize: 14 },
-  textPrimary: { color: appColors.white },
-  textSecondary: { color: appColors.primary },
+  disabled: { opacity: 0.4 },
+  text: { fontFamily: fonts.semiBold, fontSize: 14 },
+  textPrimary: { color: colors.white },
+  textSecondary: { color: colors.primary },
+  textDanger: { color: colors.error },
 });

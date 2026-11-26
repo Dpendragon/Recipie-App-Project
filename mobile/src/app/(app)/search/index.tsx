@@ -16,7 +16,6 @@ import { hasActiveFilters } from '@/constants/searchFilters';
 import { colors, fonts, radius } from '@/constants/theme';
 import { useRecipeSearch } from '@/hooks/useRecipeSearch';
 import { useSearch } from '@/hooks/useSearch';
-import { showComingSoon } from '@/utils/helpers';
 
 // Màn tìm kiếm gộp: tìm theo tên món và/hoặc nguyên liệu, kèm bộ lọc, trong cùng một màn hình.
 export default function SearchScreen() {
@@ -49,7 +48,8 @@ export default function SearchScreen() {
         icon={icons.searchLarge}
         title="Bạn muốn nấu món gì?"
         message="Nhập tên món rồi bấm nút Tìm trên bàn phím, hoặc chọn nguyên liệu đang có."
-        primaryAction={{ label: 'Chọn nguyên liệu', onPress: goIngredients }}
+        actionTitle="Chọn nguyên liệu"
+        onAction={goIngredients}
       />
     ) : status === 'loading' ? (
       <View style={styles.skeletons}>
@@ -67,8 +67,9 @@ export default function SearchScreen() {
         icon={icons.basket}
         title="Chưa tìm thấy món phù hợp"
         message="Thử đổi từ khoá, bỏ bớt nguyên liệu hoặc nới lỏng bộ lọc để xem thêm món."
-        primaryAction={{ label: 'Thay đổi nguyên liệu', onPress: goIngredients }}
-        secondaryAction={hasActiveFilters(filters) ? { label: 'Xóa bộ lọc', onPress: resetFilters } : undefined}
+        actionTitle="Thay đổi nguyên liệu"
+        onAction={goIngredients}
+        secondaryAction={hasActiveFilters(filters) ? { title: 'Xóa bộ lọc', onPress: resetFilters } : undefined}
       />
     );
 
@@ -90,7 +91,12 @@ export default function SearchScreen() {
           <RecipeCard
             recipe={item}
             variant="compact"
-            onPress={() => showComingSoon('Xem chi tiết công thức')}
+            onPress={() =>
+              router.push({
+                pathname: '/recipe/[id]',
+                params: { id: item.id, source: item.source },
+              })
+            }
           />
         )}
         ItemSeparatorComponent={Separator}

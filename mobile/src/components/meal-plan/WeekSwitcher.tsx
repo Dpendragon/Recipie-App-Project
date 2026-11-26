@@ -11,7 +11,7 @@ type Props = {
   onNext: () => void;
 };
 
-// Thẻ "Chọn tuần": chuyển xem tuần trước / tuần sau (UC-22 bước 2).
+// Thẻ "Chọn tuần": chuyển xem tuần trước / tuần sau.
 export function WeekSwitcher({ weekStart, plannedCount, onPrev, onNext }: Props) {
   const relative = relativeWeekName(weekStart);
   const countText = `${plannedCount} món đã lên kế hoạch`;

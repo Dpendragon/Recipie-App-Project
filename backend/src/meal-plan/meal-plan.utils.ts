@@ -3,7 +3,7 @@ import { MealSlot } from '../generated/prisma/enums';
 
 export const DATE_ONLY_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
-// API dùng chữ thường như tài liệu (Mục 7.10); Prisma dùng BREAKFAST/LUNCH/DINNER.
+// API dùng chữ thường (breakfast/lunch/dinner); Prisma dùng BREAKFAST/LUNCH/DINNER.
 export const MEAL_SLOT_VALUES = ['breakfast', 'lunch', 'dinner'] as const;
 export type MealSlotValue = (typeof MEAL_SLOT_VALUES)[number];
 

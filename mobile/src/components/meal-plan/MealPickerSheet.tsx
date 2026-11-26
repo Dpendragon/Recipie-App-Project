@@ -16,9 +16,9 @@ import { NoticeBox } from '@/components/common/NoticeBox';
 import { ScreenTitle } from '@/components/common/ScreenTitle';
 import { icons } from '@/constants/assets';
 import { appColors, appFonts, appRadius, SCREEN_PADDING } from '@/constants/theme';
-import { getFavorites } from '@/services/api/favoritesApi';
+import * as favoriteApi from '@/services/api/favoriteApi';
 import { addMealPlanEntry, changeMealPlanEntry } from '@/services/api/mealPlanApi';
-import type { Favorite, FavoritesPage } from '@/types/favorite.types';
+import type { Favorite, FavoriteListResponse } from '@/types/favorite.types';
 import type { MealPlanEntry, MealSlot } from '@/types/mealPlan.types';
 import { getApiErrorMessage } from '@/utils/helpers';
 import {
@@ -33,7 +33,7 @@ import { SOURCE_LABELS } from './MealSlotSection';
 
 const PAGE_SIZE = 20;
 
-// add: thêm món mới vào 1 buổi (UC-21). change: thay đúng 1 món đã gán (UC-23).
+// add: thêm món mới vào 1 buổi. change: thay đúng 1 món đã gán.
 export type PickerMode =
   | { type: 'add'; date: Date; slot: MealSlot }
   | { type: 'change'; date: Date; entry: MealPlanEntry };
@@ -65,7 +65,7 @@ function PickerContent({
     mode.type === 'add' ? mode.slot : mode.entry.mealSlot,
   );
   const [favorites, setFavorites] = useState<Favorite[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<number | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -74,7 +74,7 @@ function PickerContent({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const loadingRef = useRef(true);
 
-  const applyPage = useCallback((page: FavoritesPage, append: boolean) => {
+  const applyPage = useCallback((page: FavoriteListResponse, append: boolean) => {
     setFavorites((prev) => (append ? [...prev, ...page.data] : page.data));
     setCursor(page.meta.nextCursor);
     setHasMore(page.meta.hasMore);
@@ -83,7 +83,7 @@ function PickerContent({
   // Tải trang đầu danh sách Yêu thích khi mở sheet.
   useEffect(() => {
     let active = true;
-    getFavorites({ limit: PAGE_SIZE })
+    favoriteApi.list(undefined, PAGE_SIZE)
       .then((page) => {
         if (active) applyPage(page, false);
       })
@@ -100,13 +100,13 @@ function PickerContent({
   }, [applyPage]);
 
   // Tải trang kế tiếp khi cuộn gần cuối, hoặc thử lại sau lỗi.
-  const loadPage = async (nextCursor: string | null) => {
+  const loadPage = async (nextCursor: number | null) => {
     if (loadingRef.current) return;
     loadingRef.current = true;
     setLoading(true);
     setLoadError(null);
     try {
-      applyPage(await getFavorites({ cursor: nextCursor, limit: PAGE_SIZE }), nextCursor !== null);
+      applyPage(await favoriteApi.list(nextCursor ?? undefined, PAGE_SIZE), nextCursor !== null);
     } catch (error) {
       setLoadError(getApiErrorMessage(error));
     } finally {

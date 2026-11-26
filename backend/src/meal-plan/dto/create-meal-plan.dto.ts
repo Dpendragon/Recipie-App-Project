@@ -6,7 +6,7 @@ import {
 } from '../meal-plan.utils';
 import { UpdateMealPlanDto } from './update-meal-plan.dto';
 
-// THÊM MÓN (UC-21) = thông tin công thức (giống đổi món) + ngày + buổi ăn.
+// Thêm món = thông tin công thức (giống đổi món) + ngày + buổi ăn.
 export class CreateMealPlanDto extends UpdateMealPlanDto {
   // Kiểm tra ngày có thật (vd 2026-02-30) được làm ở service.
   @Matches(DATE_ONLY_REGEX, { message: 'Ngày phải có dạng YYYY-MM-DD' })
